@@ -2,12 +2,14 @@
 ### *Nadin Ey and Noah Shutty*
 
 ## Introduction
-We propose to implement better threads with the twist of a RFID card-controlled policies.
+We propose to implement better threads with the twist of RFID card-controlled policies.
 
 One source of inspiration is the following suggested project:
 *"Make a clean system that can sensibly blend pre-emptive, cooperative, and deadline-based run-to-completion threads (which do not need context switching)"*
 
 We are interested in all of the concepts above, and also in adding auxiliary hardware. RFID could be a fun way to interact with the pi via card interaction events captured by the kernel. We imagine modifying the thread scheduling policies and/or priorities on the fly using thread badging.
+
+The scheduler may become somewhat complicated to support the three forms of context switching mentioned above. The different types of threads may interact nontrivially. Hopefully we get all of this functionality working and well-tested.
 
 
 ## Tasks
