@@ -1,5 +1,6 @@
 #include "rpi.h"
 #include "rpi-thread.h"
+#include "timer-interrupt.h"
 
 // typedef rpi_thread_t E;
 #define E rpi_thread_t
@@ -95,7 +96,11 @@ void rpi_yield(void) {
 // starts the thread system: nothing runs before.
 // 	- <preemptive_p> = 1 implies pre-emptive multi-tasking.
 void rpi_thread_start(int preemptive_p) {
-	assert(!preemptive_p);
+	if(preemptive_p) {
+       install_int_handlers();
+       timer_interrupt_init(0x4);
+       system_enable_interrupts();
+	}
 
 	// if runq is empty, return.
 	// otherwise:
