@@ -1,5 +1,5 @@
 # Final Project Proposal
-### *Nadin Ey and Noah Shutty*
+### *Nadin El-Yabroudi and Noah Shutty*
 
 ## Introduction
 We propose to implement better threads with the twist of RFID card-controlled policies.
