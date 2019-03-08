@@ -97,10 +97,28 @@ void part2(void) {
 	assert(thread_count == n);
 }
 
+static void increase_mem_by_one(void* addr){
+	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+	int* int_addr = (int*)addr;
+    *int_addr += 1;
+}
+
+void preemptive_thread_increase(void) {
+    printk("Running write to one memory\n");
+    int n = 40;
+    int* addr = (void*)0x100000;
+    for(int i= 0; i<n; i++) {
+    	rpi_fork(increase_mem_by_one, (void*)addr);
+    }
+    rpi_thread_start(1);
+    printk("Addr value is %d\n", *addr);
+}
+
 void notmain() {
         uart_init();
+     preemptive_thread_increase();
         //part0();
-        part1();
+        //part1();
 	// for(int i = 0; i < 20; i++)
 	// 	part2();
 	clean_reboot();
