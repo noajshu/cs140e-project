@@ -4,9 +4,13 @@
 NAME=thread-test
 TI=  ../../lab7-interrupts/timer-int/
 OBJS = $(NAME).o 		\
-	$(LIBPI_PATH)/cs140e-start.o\
 	rpi-thread.o\
-	thread-asm.o
+	thread-asm.o\
+	$(TI)/interrupts-asm.o	\
+	$(TI)/interrupts-c.o	\
+	$(TI)/cstart.o		\
+	$(TI)/start.o		\
+	$(TI)/timer-interrupt.o
 
 ifndef LIBPI_PATH
 $(error LIBPI_PATH is not set: this should contain the absolute path to where this directory is.  Define it in your shell's initialiation.  For example, .tcshrc for tcsh or .bashrc for bash)
@@ -29,7 +33,7 @@ libpi:
 	@make -C $(LIBPI_PATH)
 
 $(NAME).bin: $(TI)/memmap $(OBJS)
-	$(LD) $(OBJS) -T $(LIBPI_PATH)/memmap -o $(NAME).elf  $(LPI)
+	$(LD) $(OBJS) -T $(TI)/memmap -o $(NAME).elf  $(LPI)
 	$(OD) -D $(NAME).elf > $(NAME).list
 	$(OCP) $(NAME).elf -O binary $(NAME).bin
 
