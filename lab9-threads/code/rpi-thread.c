@@ -93,6 +93,31 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
+int* int_handler(unsigned pc) {
+    /*Code here should decide whether to preempt or not and to which 
+    thread to preempto to*/
+	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
+	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
+		printk("Preemption, switching threads!\n");
+		rpi_thread_t* previous_thread = cur_thread;
+		cur_thread = Q_pop(&runq);
+
+		if(!cur_thread) {
+			cur_thread = previous_thread;
+			RPI_GetArmTimer()->IRQClear = 1;
+			return NULL;
+		}
+		
+		Q_append(&runq, previous_thread);
+		/* Clear the ARM Timer interrupt - it's the only interrupt 
+		* we have enabled, so we want don't have to work out which 
+		* interrupt source caused us to interrupt */
+		// printk("switching off irq\n");
+		// RPI_GetArmTimer()->IRQClear = 1;
+		return cur_thread->sp;
+	}
+}
+
 // starts the thread system: nothing runs before.
 // 	- <preemptive_p> = 1 implies pre-emptive multi-tasking.
 void rpi_thread_start(int preemptive_p) {
@@ -115,6 +140,7 @@ void rpi_thread_start(int preemptive_p) {
 	rpi_cswitch(&scheduler_thread->sp, &cur_thread->sp);
 
 	printk("THREAD: done with all threads, returning\n");
+	system_disable_interrupts();
 }
 
 // pointer to the current thread.  
