@@ -93,7 +93,7 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
-int* int_handler(unsigned pc) {
+unsigned int* int_handler(unsigned pc) {
     /*Code here should decide whether to preempt or not and to which 
     thread to preempto to*/
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
@@ -105,7 +105,7 @@ int* int_handler(unsigned pc) {
 		if(!cur_thread) {
 			cur_thread = previous_thread;
 			RPI_GetArmTimer()->IRQClear = 1;
-			return NULL;
+			return 0;
 		}
 		
 		Q_append(&runq, previous_thread);
@@ -113,7 +113,7 @@ int* int_handler(unsigned pc) {
 		* we have enabled, so we want don't have to work out which 
 		* interrupt source caused us to interrupt */
 		// printk("switching off irq\n");
-		// RPI_GetArmTimer()->IRQClear = 1;
+		RPI_GetArmTimer()->IRQClear = 1;
 		return cur_thread->sp;
 	}
 }
