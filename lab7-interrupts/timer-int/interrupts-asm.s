@@ -80,7 +80,6 @@ interrupt_asm:
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
   pop {r0-r1}
-  bl check_regs
 
   @r2 holds the sp of the prev thread
   ldr r2, [r1]
@@ -132,7 +131,9 @@ interrupt_asm:
   @ update the value of the new thread sp in the struct
   str sp, [r1]
 
-  bx lr
+
+  @TODO: change cpsr to enable interrupts again, do we need to be in supervisor mode?
+  movs pc, lr
 
 
 
