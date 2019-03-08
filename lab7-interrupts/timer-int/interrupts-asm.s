@@ -68,20 +68,102 @@ interrupt_asm:
   @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
   mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
   sub   lr, lr, #4
+  push {r0-r12, lr}
 
-  push  {r0-r12,lr}         @ XXX: pushing too many registers: only need caller
+  @mov r0, lr
+  sub sp, sp, #4
+  mov r0, sp 
+  sub sp, sp, #4
+  mov r1, sp
+  bl  interrupt_vector 
+
+  @r0 has addr for sp of next thread
+  @r1 has addr of sp of prev thread
+  pop {r0-r1}
+  bl check_regs
+
+  @r2 holds the sp of the prev thread
+  ldr r2, [r1]
+  add r2, #-60
+
+  @pop the reg values of the prev thread one by one 
+  @and store them in the prev thread stack
+  pop {r3}
+  str r3, [r2]
+  pop {r3}
+  str r3, [r2, #4]
+  pop {r3}
+  str r3, [r2, #8]
+  pop {r3}
+  str r3, [r2, #12]
+  pop {r3}
+  str r3, [r2, #16]
+  pop {r3}
+  str r3, [r2, #20]
+  pop {r3}
+  str r3, [r2, #24]
+  pop {r3}
+  str r3, [r2, #28]
+  pop {r3}
+  str r3, [r2, #32]
+  pop {r3}
+  str r3, [r2, #36]
+  pop {r3}
+  str r3, [r2, #40]
+  pop {r3}
+  str r3, [r2, #44]
+  pop {r3}
+  str r3, [r2, #48]
+  pop {r3}
+  str r3, [r2, #52]
+  mrs r3, spsr
+  str r3, [r2, #56]
+
+  @update the prev thread sp in the struct
+  str r2, [r0]
+
+  @load the value of the new thread sp onto r2
+  ldr r2, [r1]
+
+  @restore prev reg values
+  mov sp, r2
+  pop {r0-r12, lr}
+
+  @ update the value of the new thread sp in the struct
+  str sp, [r1]
+
+  bx lr
+
+
+
+
+  @push  {r0-r12,lr}         @ XXX: pushing too many registers: only need caller
   @ vpush {s0-s15}	    @ uncomment if want to save caller-saved fp regs
 
-  mov   r0, lr              @ Pass old pc
-  bl    interrupt_vector    @ C function
+  @stm r0, {lr}
+  @stm r1, {pc}^
+  @bl check_regs
+
+  @mrs r0, spsr
+  @mov r1, sp
+  @mov r2, lr
+  @push {r0-r2}
+
+  @mov   r0, lr              @ Pass old pc
+  @bl    interrupt_vector    @ C function
+  @cmp r0, #0
+  @ do context switch here
+  @bne _interrupt_context_switch
+
 
   @ vpop {s0-s15}           @ pop caller saved fp regs
-  pop   {r0-r12,lr} 	    @ pop integer registers
+  @pop   {r0-r12,lr} 	    @ pop integer registers
 
   @ return from interrupt handler: will re-enable general ints.
-  movs    pc, lr        @ moves the link register into the pc and implicitly
+  @movs    pc, lr        @ moves the link register into the pc and implicitly
                         @ loads the PC with the result, then copies the 
                         @ SPSR to the CPSR.
+
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @ we don't generate any of these, will just panic and halt.
