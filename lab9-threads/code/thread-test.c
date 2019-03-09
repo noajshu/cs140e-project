@@ -97,11 +97,14 @@ void part2(void) {
 	assert(thread_count == n);
 }
 
-static void increase_mem_by_one(void* addr){
-	while(1){
-	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-    delay_ms(100);
+volatile unsigned count = 0;
+static void increase_mem_by_one(void* arg){
+	while(count < 100000){
+		// printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+	    // delay_ms(3000);
+		count++;
     }
+	count = 0;
 	//int* int_addr = (int*)addr;
     //*int_addr += 1;
 }
@@ -123,6 +126,6 @@ void notmain() {
         //part0();
         //part1();
 	// for(int i = 0; i < 20; i++)
-	// 	part2();
+		// part2();
 	clean_reboot();
 }
