@@ -98,7 +98,7 @@ unsigned int* int_handler(unsigned int* prev_thread_sp, unsigned int* next_threa
     thread to preempto to*/
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
-		printk("Preemption, switching threads!\n");
+		//printk("Preemption, switching threads!\n");
 		rpi_thread_t* previous_thread = cur_thread;
 		cur_thread = Q_pop(&runq);
 
@@ -113,9 +113,10 @@ unsigned int* int_handler(unsigned int* prev_thread_sp, unsigned int* next_threa
 		* we have enabled, so we want don't have to work out which 
 		* interrupt source caused us to interrupt */
 		// printk("switching off irq\n");
-		RPI_GetArmTimer()->IRQClear = 1;
+		//RPI_GetArmTimer()->IRQClear = 1;
 		//return if we should preempt or not
 		printk("previous_thread sp %x, next thread sp %x\n", previous_thread->sp, cur_thread->sp);
+		//printk("switching to thread %d\n", cur_thread->tid);
 		*prev_thread_sp = &previous_thread->sp;
 		*next_thread_sp = &cur_thread->sp;
 	}
@@ -154,7 +155,7 @@ rpi_thread_t *rpi_cur_thread(void) {
 
 // call this an other routines from assembler to print out different
 // registers!
-void check_regs(unsigned int* r0, unsigned int* r1, unsigned sp, unsigned lr) {
-	printk("r0=%x, r1=%x lr=%x cpsr=%x\n", *r0, *r1, lr, sp);
-	clean_reboot();
+void check_regs(unsigned r0, unsigned r1, unsigned r2, unsigned r3) {
+	printk("r0=%x, r1=%x r2=%x r3=%x\n", r0, r1, r2, r3);
+	//clean_reboot();
 }
