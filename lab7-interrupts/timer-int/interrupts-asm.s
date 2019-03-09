@@ -83,57 +83,79 @@ interrupt_asm:
 
   @r2 holds the sp of the prev thread
   ldr r2, [r1]
-  add r2, #-60
+  add r2, #-64
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
-  pop {r3}
+  pop {r3} //r0
   str r3, [r2]
-  pop {r3}
+  pop {r3} //r1
   str r3, [r2, #4]
-  pop {r3}
+  pop {r3} //r2
   str r3, [r2, #8]
-  pop {r3}
+  pop {r3} //r3
   str r3, [r2, #12]
-  pop {r3}
+  pop {r3} //r4
   str r3, [r2, #16]
-  pop {r3}
+  pop {r3} //r5
   str r3, [r2, #20]
-  pop {r3}
+  pop {r3} //r6
   str r3, [r2, #24]
-  pop {r3}
+  pop {r3} //r7
   str r3, [r2, #28]
-  pop {r3}
+  pop {r3} //r8
   str r3, [r2, #32]
-  pop {r3}
+  pop {r3} //r9
   str r3, [r2, #36]
-  pop {r3}
+  pop {r3} //r10
   str r3, [r2, #40]
-  pop {r3}
+  pop {r3} //r11
   str r3, [r2, #44]
-  pop {r3}
+  pop {r3} //r12
   str r3, [r2, #48]
-  pop {r3}
+  pop {r3} //pc
   str r3, [r2, #52]
-  mrs r3, spsr
+
+  stm r3, {lr}^ //lr of prev thread
+  ldr r3, [r3]
   str r3, [r2, #56]
 
+  mrs r3, spsr   //cpsr of prev thread
+  str r3, [r2, #60]
+
   @update the prev thread sp in the struct
-  str r2, [r0]
+  str r2, [r1]
 
   @load the value of the new thread sp onto r2
-  ldr r2, [r1]
+  ldr r2, [r0]
 
   @restore prev reg values
   mov sp, r2
-  pop {r0-r12, lr}
-
+  add sp, sp, #64
   @ update the value of the new thread sp in the struct
   str sp, [r1]
+  sub sp, sp, #64
 
+  @update the spsr
+  ldr r0, [sp, #60]
+  msr spsr, r0
+  @update the lr^
+  ldr r0, [sp, #56]
+  stm r0, {lr}^
+
+  pop {r0-r12, lr}
+  add sp, sp, #8
 
   @TODO: change cpsr to enable interrupts again, do we need to be in supervisor mode?
-  movs pc, lr
+  movs pc, lr   @ moves the link register into the pc and implicitly
+                @ loads the PC with the result, then copies the 
+                @ SPSR to the CPSR.
+
+
+
+
+
+
 
 
 
