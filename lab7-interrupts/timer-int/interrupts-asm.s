@@ -83,7 +83,7 @@ interrupt_asm:
 
   @r2 holds the sp of the prev thread
   ldr r2, [r1]
-  add r2, #-64
+  sub r2, r2, #64
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
@@ -127,10 +127,9 @@ interrupt_asm:
   str r2, [r1]
 
   @load the value of the new thread sp onto r2
-  ldr r2, [r0]
+  ldr sp, [r0]
 
   @restore prev reg values
-  mov sp, r2
   add sp, sp, #64
   @ update the value of the new thread sp in the struct
   str sp, [r0]
