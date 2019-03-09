@@ -98,9 +98,12 @@ void part2(void) {
 }
 
 static void increase_mem_by_one(void* addr){
+	while(1){
 	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-	int* int_addr = (int*)addr;
-    *int_addr += 1;
+    delay_ms(100);
+    }
+	//int* int_addr = (int*)addr;
+    //*int_addr += 1;
 }
 
 void preemptive_thread_increase(void) {
