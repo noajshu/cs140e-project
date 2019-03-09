@@ -133,15 +133,15 @@ interrupt_asm:
   mov sp, r2
   add sp, sp, #64
   @ update the value of the new thread sp in the struct
-  str sp, [r1]
+  str sp, [r0]
   sub sp, sp, #64
 
   @update the spsr
   ldr r0, [sp, #60]
   msr spsr, r0
   @update the lr^
-  ldr r0, [sp, #56]
-  stm r0, {lr}^
+  @ldr r0, [sp, #56]
+  @stm r0, {lr}^
 
   pop {r0-r12, lr}
   add sp, sp, #8
