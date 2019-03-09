@@ -12,6 +12,7 @@
  * noise.
  */
 #include "rpi.h"
+#include "rpi-spi.h"
 
 const int trigger_pin = 12;
 const int echo_pin = 16;
@@ -23,6 +24,8 @@ int distance_in_cm(int t1) {
 
 void notmain(void) {
     uart_init();
+	
+	spi_init();
 
 	printk("starting sonar!\n");
 
@@ -68,10 +71,6 @@ void notmain(void) {
 		i++;
 	}
 
-
-	
-
-	
 
 
 	//
