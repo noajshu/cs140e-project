@@ -124,21 +124,30 @@ interrupt_asm:
   str r3, [r2, #60]
 
   @update the prev thread sp in the struct
+  add r2, r2, #64
   str r2, [r1]
 
   @load the value of the new thread sp onto r2
   ldr sp, [r0]
-
-  @restore prev reg values
-  add sp, sp, #64
-  @ update the value of the new thread sp in the struct
-  str sp, [r0]
   sub sp, sp, #64
+
+  @restore next reg values
+  @ add sp, sp, #64
+  @ update the value of the new thread sp in the struct
+  @ str sp, [r0]
+  @ sub sp, sp, #64
 
   @update the spsr
   ldr r0, [sp, #60]
   msr spsr, r0
+
   @update the lr^
+  cps 0b11111          //@ system mode
+  @ need to go to system mode to access shadow lr
+  ldr lr, [sp, #56]
+  @stm r0, {lr}^
+  cps 0b10010          //@ irq mode
+  ldr pc, _reset_asm
   @ldr r0, [sp, #56]
   @stm r0, {lr}^
 
