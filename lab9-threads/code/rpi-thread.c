@@ -121,7 +121,7 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 		* we have enabled, so we want don't have to work out which 
 		* interrupt source caused us to interrupt */
 		// printk("switching off irq\n");
-		//RPI_GetArmTimer()->IRQClear = 1;
+		RPI_GetArmTimer()->IRQClear = 1;
 		//return if we should preempt or not
 		printk(
 			"previous_thread # %x, next thread @ %x\n",

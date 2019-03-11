@@ -120,6 +120,14 @@ interrupt_asm:
   ldr r3, [r3]
   str r3, [r2, #56]
 
+  @mov r6, r0
+  @mov r7, r1
+  @mov r1, r3
+  @mov r0, lr
+  @bl check_regs
+  @mov r0, r6
+  @mov r1, r7
+
   mrs r3, spsr   //cpsr of prev thread
   str r3, [r2, #60]
 
@@ -155,11 +163,11 @@ interrupt_asm:
   pop {r0-r12, lr}
   add sp, sp, #8
 
-  cps 0b10011
+  @cps 0b10011
   @ldr pc, _reset_asm
 
-  @mov r0, lr
-  @bl check_regs
+  @ mov r0, lr
+  @ bl check_regs
 
   @TODO: change cpsr to enable interrupts again, do we need to be in supervisor mode?
   movs pc, lr   @ moves the link register into the pc and implicitly
