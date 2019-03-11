@@ -46,12 +46,12 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	// do the brain-surgery on the new thread stack here.
 	t->sp = &t->stack[sizeof(t->stack)/sizeof(t->stack[0]) -1];
 	t->sp -= 64/4;
-	t->sp[LR_offset] = rpi_init_trampoline;
-	t->sp[R1_offset] = code;
-	t->sp[R0_offset] = arg;
+	t->sp[LR_offset] = (uint32_t)rpi_init_trampoline;
+	t->sp[R1_offset] = (uint32_t)code;
+	t->sp[R0_offset] = (uint32_t)arg;
 	t->sp[CPSR_offset] = rpi_get_cpsr();
 
-	//printk("rpi_fork with thread %x\n", t);
+	printk("rpi_fork with thread %x\n", t);
 	Q_append(&runq, t);
 	//printk("runq @ %x\n", &runq);
 	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
@@ -99,10 +99,10 @@ void rpi_yield(void) {
 void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
     /*Code here should decide whether to preempt or not and to which 
     thread to preempt to*/
-	//printk("in int_handler\n");
+	printk("in int_handler\n");
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
-		//printk("Preemption, switching threads!\n");
+		printk("Preemption, switching threads!\n");
 		rpi_thread_t* previous_thread = cur_thread;
 		//printk("runq @ %x\n", &runq);
 		//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
@@ -123,14 +123,19 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 		// printk("switching off irq\n");
 		//RPI_GetArmTimer()->IRQClear = 1;
 		//return if we should preempt or not
-		/*printk(
+		printk(
+			"previous_thread # %x, next thread @ %x\n",
+			previous_thread,
+			cur_thread->sp
+		);
+		printk(
 			"previous_thread sp %x, next thread sp %x\n",
 			previous_thread->sp,
 			cur_thread->sp
-		);*/
+		);
 		printk("switching to thread %d\n", cur_thread->tid);
-		*prev_thread_sp = &previous_thread->sp;
-		*next_thread_sp = &cur_thread->sp;
+		*prev_thread_sp = (uint32_t)&previous_thread->sp;
+		*next_thread_sp = (uint32_t)&cur_thread->sp;
 	}
 }
 
@@ -150,6 +155,7 @@ void rpi_thread_start(int preemptive_p) {
 
 	if(preemptive_p) {
 	   install_int_handlers();
+	   //timer_interrupt_init(0x4); // 4 cycles
 	   timer_interrupt_init(10000); // about 3 seconds
 	   system_enable_interrupts();
 	}

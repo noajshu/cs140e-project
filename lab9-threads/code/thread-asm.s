@@ -28,7 +28,8 @@ test_csave_stmfd:
 
 .globl rpi_get_cpsr
 rpi_get_cpsr:
-    mrs r0, cpsr
+    mrs r0,cpsr                 @ move process status register (PSR) to r0
+    bic r0,r0,#(1<<7)		@ clear 7th bit to enable interrupts
 	bx lr
 
 .globl rpi_cswitch
@@ -93,7 +94,6 @@ rpi_cswitch:
 @ 
 .globl rpi_init_trampoline
 rpi_init_trampoline:
-    bl check_regs
 	blx r1
 	b rpi_exit
 

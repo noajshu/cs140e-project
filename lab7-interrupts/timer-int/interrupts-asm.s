@@ -80,7 +80,7 @@ interrupt_asm:
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
   pop {r0-r1}
-
+  
   @r2 holds the sp of the prev thread
   ldr r2, [r1]
   sub r2, r2, #64
@@ -116,7 +116,7 @@ interrupt_asm:
   pop {r3} //pc
   str r3, [r2, #52]
 
-  stm r3, {lr}^ //lr of prev thread
+  ldm r3, {lr}^ //lr of prev thread
   ldr r3, [r3]
   str r3, [r2, #56]
 
@@ -154,6 +154,12 @@ interrupt_asm:
 
   pop {r0-r12, lr}
   add sp, sp, #8
+
+  cps 0b10011
+  @ldr pc, _reset_asm
+
+  @mov r0, lr
+  @bl check_regs
 
   @TODO: change cpsr to enable interrupts again, do we need to be in supervisor mode?
   movs pc, lr   @ moves the link register into the pc and implicitly
@@ -202,6 +208,7 @@ interrupt_asm:
 @
 reset_asm:
   sub   lr, lr, #4
+  mov   r0, lr
   bl    reset_vector
 undefined_instruction_asm:
   sub   lr, lr, #4

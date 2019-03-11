@@ -99,9 +99,9 @@ void part2(void) {
 
 volatile unsigned count = 0;
 static void increase_mem_by_one(void* arg){
-	while(count < 100){
-		//printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-	    // delay_ms(3000);
+	while(count < 100000){
+		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+	    delay_ms(3000);
 		count++;
     }
 	count = 0;
@@ -122,7 +122,7 @@ void preemptive_thread_increase(void) {
 
 void notmain() {
         uart_init();
-     preemptive_thread_increase();
+        preemptive_thread_increase();
         //part0();
         //part1();
 	// for(int i = 0; i < 20; i++)
