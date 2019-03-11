@@ -12,7 +12,9 @@
  * noise.
  */
 #include "rpi.h"
-#include "rpi-spi.h"
+#include "pwm.h"
+#include "my-spi.h"
+
 
 const int trigger_pin = 12;
 const int echo_pin = 16;
@@ -22,11 +24,125 @@ int distance_in_cm(int t1) {
 	return t1/58;
 }
 
+
+enum rfid_cmds {
+	CMD_GEN_RANDOM_ID = 0b0010,
+	CMD_IDLE = 0
+};
+enum rfid_regs {
+	REG_CMD = 0x01,
+	REG_FIFO_DATA = 0x09,
+	REG_FIFO_LEVEL = 0x0A
+};
+enum rfid_regs_access_modes {
+	REG_WRITE = 0 << 7,
+	REG_READ = 1 << 7
+};
+
+void rfid_init() {
+	// check if we need are in "power down" mode
+	gpio_set_input(25);
+	if(!gpio_read(25)) {
+		gpio_set_output(25);
+		gpio_write(25, 1);
+		delay_ms(50);
+	}
+}
+
+
+char fifo_data[100];
+char* rfid_randid() {
+	spi0->CS = 0xB0;
+	
+	// set command to gen random id
+	while (!((1 << 18) & spi0->CS)) {} // TXD
+	spi0->FIFO = ((REG_WRITE | (REG_CMD << 1)) &0xFF);
+	spi0->FIFO = (CMD_GEN_RANDOM_ID &0xFF);
+	while (!((1 << 16) & spi0->CS)) {} // DONE
+	while (!((1 << 17) & spi0->CS)) {} // RXD
+	while (((1 << 17) & spi0->CS)) {
+		printk("spi0->FIFO = %x\n", spi0->FIFO);
+	}
+	
+	delay_ms(10);
+
+	// write to the RFID fifo just for fun
+	while (!((1 << 18) & spi0->CS)) {} // TXD
+	spi0->FIFO = ((REG_WRITE | (REG_FIFO_DATA << 1)) &0xFF);
+	char* msg = "hello from mifare device";
+	for(int i=0; i < 24; i++) {
+		spi0->FIFO = (msg[i] &0xFF);
+	}
+
+
+	// read from the RFID fifo
+	while (!((1 << 18) & spi0->CS)) {} // TXD
+	spi0->FIFO = ((REG_READ | (REG_FIFO_LEVEL << 1)) &0xFF);
+	while (!((1 << 17) & spi0->CS)) {} // RXD
+	unsigned fifo_level = spi0->FIFO;
+	for(unsigned i=0; i<fifo_level; i++) {
+		spi0->FIFO = ((REG_READ | (REG_FIFO_DATA << 1)) &0xFF);
+	}
+	while (!((1 << 16) & spi0->CS)) {} // DONE
+	while (!((1 << 17) & spi0->CS)) {} // RXD
+	int j=0;
+	while (((1 << 17) & spi0->CS) && j < 100) {
+		fifo_data[j] = spi0->FIFO;
+		printk("fifo_data[j] = %x\n", fifo_data[j]);
+		j++;
+	}
+	fifo_data[j] = 0;
+	return fifo_data;
+}
+// 
+// 0b00100110
+// 0010
+// void write_
+// unsigned CMD_REQ = 
+// int cards_nearby() {
+// 
+// }
+
+
 void notmain(void) {
     uart_init();
-	
-	spi_init();
 
+	printk("enabling spi0\n");
+	spi_init();
+	printk("enabled spi0\ninitializing rfid");
+	rfid_init();
+	// printk("putting soft reset cmd to spi0\n");
+	// spi_putc((unsigned long)0b1111);
+	// printk("putting gen rand ID cmd to spi0\n");
+	// spi_putc((unsigned long)0b0010);
+	// printk("putting transmit cmd to spi0\n");
+	// spi_putc((unsigned long)0b0100);
+	// spi_putc((unsigned long)((0x01 << 1) || 0b1));
+	// printk("getting char from spi0\n");
+	// printk("got '%c'\n", spi_getc());
+
+	delay_ms(100);
+	spi0->CS = 0xB0;
+	// gpio_write(8, 0);
+	// should be version
+	for(unsigned i=1; i<55; i++) {
+		while (!((1 << 18) & spi0->CS)) {} // TXD
+		spi0->FIFO = ((1 << 7 | (i << 1)) &0xFF);
+	}
+	printk("waiting for DONE\n");
+	while (!((1 << 16) & spi0->CS)) {} // DONE
+	// printk("waiting for RXD\n");
+	while (!((1 << 17) & spi0->CS)) {} // RXD
+	while (((1 << 17) & spi0->CS)) {
+		printk("spi0->FIFO = %x\n", spi0->FIFO);
+	}
+	spi0->CS = 0x0;
+	delay_ms(300);
+	
+	rfid_randid();
+	printk("rfid_randid = %s\n", fifo_data);
+
+#if 0
 	printk("starting sonar!\n");
 
 	// 	1. init the device (pay attention to time delays here)
@@ -90,5 +206,7 @@ void notmain(void) {
 	// 	a longer one. 
 
 	printk("stopping sonar !\n");
+	
+#endif
 	clean_reboot();
 }
