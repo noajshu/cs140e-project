@@ -34,7 +34,7 @@ rpi_get_cpsr:
 .globl rpi_cswitch
 .extern printk
 rpi_cswitch:
-	add sp, #-60
+	add sp, #-64
 
     str r0, [sp]
     str r1, [sp, #4]
@@ -50,8 +50,9 @@ rpi_cswitch:
 	str r11, [sp, #44]
 	str r12, [sp, #48]
 	str r14, [sp, #52]
+	str r15, [sp, #56]
 	mrs r2, cpsr
-	str r2, [sp, #56]
+	str r2, [sp, #60]
 
 	@store the value of the sp for the 
 	@previous context into r0 (old context sp)
@@ -62,7 +63,7 @@ rpi_cswitch:
 	ldr sp, [r1] 
 
 	ldr r0, [sp]
-	ldr r1, [sp, #56]
+	ldr r1, [sp, #60]
 	msr cpsr, r1
 	ldr r1, [sp, #4]
 	ldr r2, [sp, #8]
@@ -78,7 +79,7 @@ rpi_cswitch:
 	ldr r12, [sp, #48]
 	ldr r14, [sp, #52]
 
-	add sp, #60
+	add sp, #64
 
 	bx lr
 
@@ -92,6 +93,7 @@ rpi_cswitch:
 @ 
 .globl rpi_init_trampoline
 rpi_init_trampoline:
+    bl check_regs
 	blx r1
 	b rpi_exit
 

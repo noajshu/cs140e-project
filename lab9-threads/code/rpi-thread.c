@@ -35,7 +35,7 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	enum { 
 		// register offsets are in terms of byte offsets!
 		LR_offset = 52/4,  
-		CPSR_offset = 56/4,
+		CPSR_offset = 60/4,
 		R0_offset = 0, 
 		R1_offset = 4/4, 
 	};
@@ -45,16 +45,16 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 
 	// do the brain-surgery on the new thread stack here.
 	t->sp = &t->stack[sizeof(t->stack)/sizeof(t->stack[0]) -1];
-	t->sp -= 60/4;
+	t->sp -= 64/4;
 	t->sp[LR_offset] = rpi_init_trampoline;
 	t->sp[R1_offset] = code;
 	t->sp[R0_offset] = arg;
 	t->sp[CPSR_offset] = rpi_get_cpsr();
 
-	printk("rpi_fork with thread %x\n", t);
+	//printk("rpi_fork with thread %x\n", t);
 	Q_append(&runq, t);
-	printk("runq @ %x\n", &runq);
-	printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
+	//printk("runq @ %x\n", &runq);
+	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
 	return t;
 }
 
@@ -99,18 +99,18 @@ void rpi_yield(void) {
 void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
     /*Code here should decide whether to preempt or not and to which 
     thread to preempt to*/
-	printk("in int_handler\n");
+	//printk("in int_handler\n");
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
-		printk("Preemption, switching threads!\n");
+		//printk("Preemption, switching threads!\n");
 		rpi_thread_t* previous_thread = cur_thread;
-		printk("runq @ %x\n", &runq);
-		printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
+		//printk("runq @ %x\n", &runq);
+		//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
 		cur_thread = Q_pop(&runq);
-		printk("got cur_thread = %x from runq\n", cur_thread);
+		//printk("got cur_thread = %x from runq\n", cur_thread);
 
 		if(!cur_thread) {
-			printk("no thread to switch to, going back\n");
+			//printk("no thread to switch to, going back\n");
 			cur_thread = previous_thread;
 			RPI_GetArmTimer()->IRQClear = 1;
 			return;
@@ -123,12 +123,12 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 		// printk("switching off irq\n");
 		//RPI_GetArmTimer()->IRQClear = 1;
 		//return if we should preempt or not
-		printk(
+		/*printk(
 			"previous_thread sp %x, next thread sp %x\n",
 			previous_thread->sp,
 			cur_thread->sp
-		);
-		//printk("switching to thread %d\n", cur_thread->tid);
+		);*/
+		printk("switching to thread %d\n", cur_thread->tid);
 		*prev_thread_sp = &previous_thread->sp;
 		*next_thread_sp = &cur_thread->sp;
 	}
@@ -155,15 +155,15 @@ void rpi_thread_start(int preemptive_p) {
 	}
 
 	
-	printk("runq @ %x\n", &runq);
-	printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
-	while (1) {
-		printk("this is the scheduler thread on an infinite loop\n");
-		delay_ms(1000);
-	}
+	//printk("runq @ %x\n", &runq);
+	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
+	// while (1) {
+	// 	printk("this is the scheduler thread on an infinite loop\n");
+	// 	delay_ms(1000);
+	// }
 	// don't want to use this since it stores state in
 	// an incompatible 60 byte format on the stack
-	printk("rpi_thread_start, about to rpi_cswitch\n");
+	//printk("rpi_thread_start, about to rpi_cswitch\n");
 	rpi_cswitch(&scheduler_thread->sp, &cur_thread->sp);
 
 	printk("THREAD: done with all threads, returning\n");

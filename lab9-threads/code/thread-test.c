@@ -99,8 +99,8 @@ void part2(void) {
 
 volatile unsigned count = 0;
 static void increase_mem_by_one(void* arg){
-	while(count < 100000){
-		// printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+	while(count < 100){
+		//printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 	    // delay_ms(3000);
 		count++;
     }
@@ -110,7 +110,7 @@ static void increase_mem_by_one(void* arg){
 }
 
 void preemptive_thread_increase(void) {
-    printk("Running write to one memory\n");
+    printk("Running write to one memory address of code %x\n", increase_mem_by_one);
     int n = 40;
     int* addr = (void*)0x100000;
     for(int i= 0; i<n; i++) {
