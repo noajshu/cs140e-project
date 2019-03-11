@@ -142,12 +142,13 @@ interrupt_asm:
   msr spsr, r0
 
   @update the lr^
-  cps 0b11111          //@ system mode
+  cps 0b10011          //@ supervisor mode
+  @ cps 0b11111          //@ system mode
   @ need to go to system mode to access shadow lr
   ldr lr, [sp, #56]
   @stm r0, {lr}^
   cps 0b10010          //@ irq mode
-  ldr pc, _reset_asm
+  @ ldr pc, _reset_asm
   @ldr r0, [sp, #56]
   @stm r0, {lr}^
 
