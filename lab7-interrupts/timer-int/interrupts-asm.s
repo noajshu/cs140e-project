@@ -69,12 +69,14 @@ interrupt_asm:
   mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
   sub   lr, lr, #4
   push {r0-r12, lr}
+  
 
-  @mov r0, lr
   sub sp, sp, #4
   mov r0, sp 
   sub sp, sp, #4
   mov r1, sp
+  @sub sp, sp, #4
+  @mov r2, sp
   bl  interrupt_vector 
 
   @r0 has addr for sp of next thread
@@ -82,58 +84,50 @@ interrupt_asm:
   pop {r0-r1}
   
   @r2 holds the sp of the prev thread
-  ldr r2, [r1]
-  sub r2, r2, #64
+  ldr r4, [r1]
+  sub r4, r4, #64
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
   pop {r3} //r0
-  str r3, [r2]
+  str r3, [r4]
   pop {r3} //r1
-  str r3, [r2, #4]
-  pop {r3} //r2
-  str r3, [r2, #8]
-  pop {r3} //r3
-  str r3, [r2, #12]
+  str r3, [r4, #4]
   pop {r3} //r4
-  str r3, [r2, #16]
+  str r3, [r4, #8]
+  pop {r3} //r3
+  str r3, [r4, #12]
+  pop {r3} //r4
+  str r3, [r4, #16]
   pop {r3} //r5
-  str r3, [r2, #20]
+  str r3, [r4, #20]
   pop {r3} //r6
-  str r3, [r2, #24]
+  str r3, [r4, #24]
   pop {r3} //r7
-  str r3, [r2, #28]
+  str r3, [r4, #28]
   pop {r3} //r8
-  str r3, [r2, #32]
+  str r3, [r4, #32]
   pop {r3} //r9
-  str r3, [r2, #36]
+  str r3, [r4, #36]
   pop {r3} //r10
-  str r3, [r2, #40]
+  str r3, [r4, #40]
   pop {r3} //r11
-  str r3, [r2, #44]
+  str r3, [r4, #44]
   pop {r3} //r12
-  str r3, [r2, #48]
+  str r3, [r4, #48]
   pop {r3} //pc
-  str r3, [r2, #52]
+  str r3, [r4, #52]
 
   ldm r3, {lr}^ //lr of prev thread
   ldr r3, [r3]
-  str r3, [r2, #56]
-
-  @mov r6, r0
-  @mov r7, r1
-  @mov r1, r3
-  @mov r0, lr
-  @bl check_regs
-  @mov r0, r6
-  @mov r1, r7
+  str r3, [r4, #56]
 
   mrs r3, spsr   //cpsr of prev thread
-  str r3, [r2, #60]
+  str r3, [r4, #60]
 
   @update the prev thread sp in the struct
-  @add r2, r2, #64
-  str r2, [r1]
+  @add r4, r2, #64
+  str r4, [r1]
 
   @load the value of the new thread sp 
   ldr sp, [r0]
@@ -160,20 +154,37 @@ interrupt_asm:
   @ldr r0, [sp, #56]
   @stm r0, {lr}^
 
-  pop {r0-r12, lr}
-  add sp, sp, #8
+  @ldr r0, [sp, #52]
+  @bl check_regs
+  @mov lr, r0
 
-  @cps 0b10011
+  @cmp r2, #1
+  @bne end
+  @pop {r0-r12, lr}
+  @mov r0, lr
+  @bl check_regs
   @ldr pc, _reset_asm
 
-  @ mov r0, lr
-  @ bl check_regs
 
-  @TODO: change cpsr to enable interrupts again, do we need to be in supervisor mode?
+  @ldr lr, [sp, #56]
+  @pop {r0-r12}
+  @pop {r0}
+  @bl check_regs
+  @add sp, sp, #8
+  @movs pc, r12
+
+  @idea: ldr pc (address of )
+  @ldr lr, [sp, #56]
+  @pop {r0-r12}
+  @add sp, sp, #12
+  @ldr r12, [sp, #-12]
+  @movs pc, r12
+
+  pop {r0-r12, lr}
+  add sp, sp, #8
   movs pc, lr   @ moves the link register into the pc and implicitly
                 @ loads the PC with the result, then copies the 
                 @ SPSR to the CPSR.
-
 
 
 
@@ -220,13 +231,17 @@ reset_asm:
   bl    reset_vector
 undefined_instruction_asm:
   sub   lr, lr, #4
+  mov   r0, lr
   bl    undefined_instruction_vector
 software_interrupt_asm:
   sub   lr, lr, #4
+  mov   r0, lr
   bl    software_interrupt_vector
 prefetch_abort_asm:
   sub   lr, lr, #4
+  mov   r0, lr
   bl    prefetch_abort_vector
 data_abort_asm:
   sub   lr, lr, #4
+  mov   r0, lr
   bl    data_abort_vector
