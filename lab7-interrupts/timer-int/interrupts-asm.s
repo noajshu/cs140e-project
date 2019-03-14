@@ -76,6 +76,8 @@ reggie1234:
 @ only handler that should run since we only enable general interrupts
 interrupt_asm:
   @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
+  mov r2, sp
+
   mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
   sub   lr, lr, #4
   push {r0-r12, lr}
@@ -88,15 +90,19 @@ interrupt_asm:
   mov r0, sp 
   sub sp, sp, #4
   mov r1, sp
+  
   bl  interrupt_vector 
 
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
-  pop {r0-r1}
+  pop {r0}
+  pop {r1}
   ldr r0, [r0]
   sub r0, r0, #64
   ldr r1, [r1]
-
+  push {r0-r12, lr}
+  @bl check_regs
+  pop {r0-r12, lr}
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
@@ -129,12 +135,16 @@ interrupt_asm:
   pop {r3} //pc
   str r3, [r1, #52]
 
-  ldm r3, {lr}^ //lr of prev thread
+  sub sp, sp, #4
+  ldm sp, {lr}^ //lr of prev thread
+  pop {r3}
   str r3, [r1, #56]
 
   mrs r3, spsr   //cpsr of prev thread
   str r3, [r1, #60]
-
+  push {r0-r12, lr}
+  @bl check_regs
+  pop {r0-r12, lr}
   @restore next reg values
 
   mov sp, r0
@@ -142,13 +152,13 @@ interrupt_asm:
   @update the spsr
   ldr r0, [sp, #60]
   msr spsr, r0
+  push {r0-r12, lr}
+  @bl check_regs
+  pop {r0-r12, lr}
 
   add r0, sp, #56
   stm r0, {lr}^
 
-  pop {r0-r12, lr}
-  push {r0-r12, lr}
-  bl check_regs
   pop {r0-r12, lr}
   add sp, sp, #8
   movs pc, lr   @ moves the link register into the pc and implicitly

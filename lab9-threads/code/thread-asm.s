@@ -61,7 +61,7 @@ rpi_cswitch:
 
 	@load the value of the new context 
 	@switch stack pointer into sp
-	ldr sp, [r1] 
+	ldr sp, [r1]
 
 	ldr r0, [sp]
 	ldr r1, [sp, #60]
@@ -80,9 +80,13 @@ rpi_cswitch:
 	ldr r12, [sp, #48]
 	ldr r14, [sp, #52]
 
-	add sp, #64
+	add sp, sp, #64
+	mov r3, sp
+	push {r0-r12, lr}
+    bl check_regs
+    pop {r0-r12, lr}
 
-	bx lr
+	mov pc, lr
 
 @ [Make sure you can answer: why do we need to do this?]
 @
