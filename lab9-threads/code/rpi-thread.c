@@ -51,7 +51,7 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	t->sp[R0_offset] = (uint32_t)arg;
 	t->sp[CPSR_offset] = rpi_get_cpsr();
 
-	printk("rpi_fork with thread %x\n", t);
+	printk("rpi_fork with thread %x\n", t->sp);
 	Q_append(&runq, t);
 	//printk("runq @ %x\n", &runq);
 	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
@@ -126,16 +126,19 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 		printk(
 			"previous_thread # %x, next thread @ %x\n",
 			previous_thread,
-			cur_thread->sp
+			cur_thread
 		);
 		printk(
 			"previous_thread sp %x, next thread sp %x\n",
-			previous_thread->sp,
+			previous_thread->sp - 64/4,
 			cur_thread->sp
 		);
 		printk("switching to thread %d\n", cur_thread->tid);
-		*prev_thread_sp = (uint32_t)&previous_thread->sp;
-		*next_thread_sp = (uint32_t)&cur_thread->sp;
+		*prev_thread_sp = (uint32_t)&(previous_thread->sp);
+		*next_thread_sp = (uint32_t)&(cur_thread->sp);
+
+		previous_thread->sp -= 64/4;
+		cur_thread->sp += 64/4;
 	}
 }
 

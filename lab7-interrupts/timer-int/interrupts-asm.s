@@ -79,127 +79,88 @@ interrupt_asm:
   mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
   sub   lr, lr, #4
   push {r0-r12, lr}
-  
+
+  @ldr r0, =0x100000
+  @cmp r0, #0
+  @bne do_not_preempt
 
   sub sp, sp, #4
   mov r0, sp 
   sub sp, sp, #4
   mov r1, sp
-  @sub sp, sp, #4
-  @mov r2, sp
   bl  interrupt_vector 
 
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
   pop {r0-r1}
-  
-  @r2 holds the sp of the prev thread
-  ldr r4, [r1]
-  sub r4, r4, #64
+  ldr r0, [r0]
+  sub r0, r0, #64
+  ldr r1, [r1]
+
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
   pop {r3} //r0
-  str r3, [r4]
+  str r3, [r1]
   pop {r3} //r1
-  str r3, [r4, #4]
+  str r3, [r1, #4]
   pop {r3} //r4
-  str r3, [r4, #8]
+  str r3, [r1, #8]
   pop {r3} //r3
-  str r3, [r4, #12]
+  str r3, [r1, #12]
   pop {r3} //r4
-  str r3, [r4, #16]
+  str r3, [r1, #16]
   pop {r3} //r5
-  str r3, [r4, #20]
+  str r3, [r1, #20]
   pop {r3} //r6
-  str r3, [r4, #24]
+  str r3, [r1, #24]
   pop {r3} //r7
-  str r3, [r4, #28]
+  str r3, [r1, #28]
   pop {r3} //r8
-  str r3, [r4, #32]
+  str r3, [r1, #32]
   pop {r3} //r9
-  str r3, [r4, #36]
+  str r3, [r1, #36]
   pop {r3} //r10
-  str r3, [r4, #40]
+  str r3, [r1, #40]
   pop {r3} //r11
-  str r3, [r4, #44]
+  str r3, [r1, #44]
   pop {r3} //r12
-  str r3, [r4, #48]
+  str r3, [r1, #48]
   pop {r3} //pc
-  str r3, [r4, #52]
+  str r3, [r1, #52]
 
   ldm r3, {lr}^ //lr of prev thread
-  str r3, [r4, #56]
+  str r3, [r1, #56]
 
   mrs r3, spsr   //cpsr of prev thread
-  str r3, [r4, #60]
-
-  @update the prev thread sp in the struct
-  @add r4, r2, #64
-  str r4, [r1]
-
-  @load the value of the new thread sp 
-  ldr sp, [r0]
-  @sub sp, sp, #64
+  str r3, [r1, #60]
 
   @restore next reg values
-  add sp, sp, #64
-  @ update the value of the new thread sp in the struct
-  str sp, [r0]
-  sub sp, sp, #64
+
+  mov sp, r0
 
   @update the spsr
   ldr r0, [sp, #60]
   msr spsr, r0
 
-  @update the lr^
-  @cps 0b10011          //@ supervisor mode
-  @ cps 0b11111          //@ system mode
-  @ need to go to system mode to access shadow lr
-  @ldr lr, [sp, #56]
-  @stm r0, {lr}^
-  @cps 0b10010          //@ irq mode
-  @ ldr pc, _reset_asm
-  @ldr r0, [sp, #56]
-  @stm r0, {lr}^
-
-  @ldr r0, [sp, #52]
-  @bl check_regs
-  @mov lr, r0
-
-  @cmp r2, #1
-  @bne end
-  @pop {r0-r12, lr}
-  @mov r0, lr
-  @bl check_regs
-  @ldr pc, _reset_asm
-
-
-  @ldr lr, [sp, #56]
-  @pop {r0-r12}
-  @pop {r0}
-  @bl check_regs
-  @add sp, sp, #8
-  @movs pc, r12
-
-  @idea: ldr pc (address of )
-  @ldr lr, [sp, #56]
-  @pop {r0-r12}
-  @add sp, sp, #12
-  @ldr r12, [sp, #-12]
-  @movs pc, r12
+  add r0, sp, #56
+  stm r0, {lr}^
 
   pop {r0-r12, lr}
-  
+  push {r0-r12, lr}
   bl check_regs
-
+  pop {r0-r12, lr}
   add sp, sp, #8
   movs pc, lr   @ moves the link register into the pc and implicitly
                 @ loads the PC with the result, then copies the 
                 @ SPSR to the CPSR.
 
 
-
+do_not_preempt:
+   pop {r0-r12, lr}
+   mov r0, lr
+   bl check_regs
+   movs pc, lr
 
 
 
