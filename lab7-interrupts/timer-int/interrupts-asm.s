@@ -63,6 +63,16 @@ _data_abort_asm:              .word data_abort_asm
 _interrupt_asm:               .word interrupt_asm
 _interrupt_table_end:
 
+
+.globl reggie1234
+reggie1234:
+  mov r0, #1
+  mov r1, #2
+  mov r2, #3
+  mov r3, #4
+  b reggie1234
+
+
 @ only handler that should run since we only enable general interrupts
 interrupt_asm:
   @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
@@ -119,7 +129,6 @@ interrupt_asm:
   str r3, [r4, #52]
 
   ldm r3, {lr}^ //lr of prev thread
-  ldr r3, [r3]
   str r3, [r4, #56]
 
   mrs r3, spsr   //cpsr of prev thread
@@ -181,6 +190,9 @@ interrupt_asm:
   @movs pc, r12
 
   pop {r0-r12, lr}
+  
+  bl check_regs
+
   add sp, sp, #8
   movs pc, lr   @ moves the link register into the pc and implicitly
                 @ loads the PC with the result, then copies the 

@@ -14,6 +14,7 @@
 // verify they make sense (how?)
 unsigned *test_csave(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
 unsigned *test_csave_stmfd(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
+void reggie1234(void *arg);
 
 void part0(void) {
 	printk("running part0\n");
@@ -26,7 +27,7 @@ void part0(void) {
 	assert((cpsr & 0xff) == 0xd3);
 
 	// stack grows down.
-	unsigned u[128+1], *e = &u[127], n, *p;
+	uint32_t u[128+1], *e = &u[127], n, *p;
 	u[127] = 0;
 	u[128] = 0;
 	printk("end of save=%p\n", &u[127]);
@@ -111,10 +112,11 @@ static void increase_mem_by_one(void* arg){
 
 void preemptive_thread_increase(void) {
     printk("Running write to one memory address of code %x\n", increase_mem_by_one);
-    int n = 40;
+    int n = 4;
     int* addr = (void*)0x100000;
     for(int i= 0; i<n; i++) {
-    	rpi_fork(increase_mem_by_one, (void*)addr);
+    	// rpi_fork(increase_mem_by_one, (void*)addr);
+		rpi_fork(reggie1234, (void*)addr);
     }
     rpi_thread_start(1);
     printk("Addr value is %d\n", *addr);

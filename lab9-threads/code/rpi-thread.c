@@ -156,7 +156,7 @@ void rpi_thread_start(int preemptive_p) {
 	if(preemptive_p) {
 	   install_int_handlers();
 	   //timer_interrupt_init(0x4); // 4 cycles
-	   timer_interrupt_init(10000); // about 3 seconds
+	   timer_interrupt_init(7000); // about 3 seconds
 	   system_enable_interrupts();
 	}
 
@@ -186,5 +186,6 @@ rpi_thread_t *rpi_cur_thread(void) {
 // registers!
 void check_regs(unsigned r0, unsigned r1, unsigned r2, unsigned r3) {
 	printk("r0=%x, r1=%x r2=%x r3=%x\n", r0, r1, r2, r3);
+	return;
 	//clean_reboot();
 }
