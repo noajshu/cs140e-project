@@ -27,17 +27,65 @@ int distance_in_cm(int t1) {
 
 enum rfid_cmds {
 	CMD_GEN_RANDOM_ID = 0b0010,
-	CMD_IDLE = 0
+	CMD_IDLE = 0,
+	CMD_TRANSCEIVE = 0b1100
 };
 enum rfid_regs {
 	REG_CMD = 0x01,
 	REG_FIFO_DATA = 0x09,
-	REG_FIFO_LEVEL = 0x0A
+	REG_FIFO_LEVEL = 0x0A,
+	REG_TXCTL = 0x14,
+	REG_COLL = 0x0e,
+	REG_STATUS2 = 0x08,
 };
 enum rfid_regs_access_modes {
 	REG_WRITE = 0 << 7,
 	REG_READ = 1 << 7
 };
+
+// k = expected number of send bytes
+// n = expected number of received bytes
+void rfid_transaction(char* inbuf, char* outbuf, unsigned k, unsigned n) {
+	spi0->CS = 0xB0;
+	// CLEAR RX FIFO (this will discard any data inside)
+	while(((1 << 17) & spi0->CS)) {
+		char junk = spi0->FIFO;
+	}
+	while(!((1<<18) & spi0->CS)) {} // TXD full
+	unsigned i = 0, j = 0;
+	// printk("about to go in ij loop with k=%d, n=%d\n", k, n);
+	while ((i < k) || (j < n)) {
+		// printk("i=%d, j=%d\n", i, j);
+		while((i < k) && ((1 << 18) & spi0->CS)) {
+			// TXD can accept data
+			spi0->FIFO = inbuf[i] &0xFF;
+			i++;
+		}
+		while((j < n) && ((1 << 17) & spi0->CS)) {
+			// RXD has data
+			outbuf[j] = spi0->FIFO;
+			j++;
+		}
+	}
+	while (!((1 << 16) & spi0->CS)) {} // DONE
+	spi0->CS = 0x0;
+	return;
+}
+
+void rfid_write_reg(char reg, char val) {
+	char msg[2];
+	msg[0] = REG_WRITE | (reg << 1);
+	msg[1] = val;
+	return rfid_transaction(msg, (void*)0, 2, 0);
+}
+
+char rfid_read_reg(char reg) {
+	char msg = REG_READ | (reg << 1);
+	char out[1];
+	rfid_transaction(&msg, out, 1, 1);
+	return out[0];
+}
+
 
 void rfid_init() {
 	// check if we need are in "power down" mode
@@ -47,11 +95,12 @@ void rfid_init() {
 		gpio_write(25, 1);
 		delay_ms(50);
 	}
+	rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b11) | 0b11);
 }
 
 
-char fifo_data[100];
-char* rfid_randid() {
+void rfid_loopback(char* fifo_data) {
+
 	spi0->CS = 0xB0;
 	
 	// set command to gen random id
@@ -92,8 +141,28 @@ char* rfid_randid() {
 		j++;
 	}
 	fifo_data[j] = 0;
-	return fifo_data;
+	spi0->CS = 0x0;
+
+	return;
 }
+
+
+char* rfid_loopback_simple() {
+	char* message = "  hello simple from mifare device!!";
+	message[0] = REG_WRITE | (REG_FIFO_DATA << 1);
+	char buf[100];
+	// put message in fifo
+	printk("putting message in fifo\n");
+	rfid_transaction(message, (void*)0, strlen(message), 0);
+	// retrive message from fifo
+	char readcmd[100];
+	for(unsigned i=0; i<100; i++)
+		readcmd[i] = REG_READ | (REG_FIFO_DATA << 1);
+	rfid_transaction(readcmd, buf, strlen(message), strlen(message));
+
+	return message;
+}
+
 // 
 // 0b00100110
 // 0010
@@ -111,36 +180,63 @@ void notmain(void) {
 	spi_init();
 	printk("enabled spi0\ninitializing rfid");
 	rfid_init();
-	// printk("putting soft reset cmd to spi0\n");
-	// spi_putc((unsigned long)0b1111);
-	// printk("putting gen rand ID cmd to spi0\n");
-	// spi_putc((unsigned long)0b0010);
-	// printk("putting transmit cmd to spi0\n");
-	// spi_putc((unsigned long)0b0100);
-	// spi_putc((unsigned long)((0x01 << 1) || 0b1));
-	// printk("getting char from spi0\n");
-	// printk("got '%c'\n", spi_getc());
+	// // printk("putting soft reset cmd to spi0\n");
+	// // spi_putc((unsigned long)0b1111);
+	// // printk("putting gen rand ID cmd to spi0\n");
+	// // spi_putc((unsigned long)0b0010);
+	// // printk("putting transmit cmd to spi0\n");
+	// // spi_putc((unsigned long)0b0100);
+	// // spi_putc((unsigned long)((0x01 << 1) || 0b1));
+	// // printk("getting char from spi0\n");
+	// // printk("got '%c'\n", spi_getc());
+	// 
+	// delay_ms(100);
+	// spi0->CS = 0xB0;
+	// // gpio_write(8, 0);
+	// // should be version
+	// for(unsigned i=1; i<55; i++) {
+	// 	while (!((1 << 18) & spi0->CS)) {} // TXD
+	// 	spi0->FIFO = ((1 << 7 | (i << 1)) &0xFF);
+	// }
+	// printk("waiting for DONE\n");
+	// while (!((1 << 16) & spi0->CS)) {} // DONE
+	// // printk("waiting for RXD\n");
+	// while (!((1 << 17) & spi0->CS)) {} // RXD
+	// while (((1 << 17) & spi0->CS)) {
+	// 	printk("spi0->FIFO = %x\n", spi0->FIFO);
+	// }
+	// spi0->CS = 0x0;
+	// delay_ms(300);
+	// 
+	// char fifo_data[100];
+	// rfid_loopback(fifo_data);
+	// printk("rfid_loopback = %s\n", fifo_data);
+	// printk("rfid_loopback_simple = %s\n", rfid_loopback_simple());
 
-	delay_ms(100);
-	spi0->CS = 0xB0;
-	// gpio_write(8, 0);
-	// should be version
-	for(unsigned i=1; i<55; i++) {
-		while (!((1 << 18) & spi0->CS)) {} // TXD
-		spi0->FIFO = ((1 << 7 | (i << 1)) &0xFF);
+
+	printk(
+		"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
+		rfid_read_reg(REG_CMD) & 0b1111
+	);
+
+	printk("setting up transcieve mode\n");
+	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_TRANSCEIVE);
+	rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
+	for(int i=0; i<200; i++) {
+		printk(
+			"rfid_read_reg(REG_COLL) & 0b11111 = %b\n",
+			rfid_read_reg(REG_COLL) & 0b11111
+		);
+		printk(
+			"rfid_read_reg(REG_STATUS2) & 0b111 = %b\n",
+			rfid_read_reg(REG_STATUS2) & 0b111
+		);
+		printk(
+			"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
+			rfid_read_reg(REG_CMD) & 0b1111
+		);
+		delay_ms(100);
 	}
-	printk("waiting for DONE\n");
-	while (!((1 << 16) & spi0->CS)) {} // DONE
-	// printk("waiting for RXD\n");
-	while (!((1 << 17) & spi0->CS)) {} // RXD
-	while (((1 << 17) & spi0->CS)) {
-		printk("spi0->FIFO = %x\n", spi0->FIFO);
-	}
-	spi0->CS = 0x0;
-	delay_ms(300);
-	
-	rfid_randid();
-	printk("rfid_randid = %s\n", fifo_data);
 
 #if 0
 	printk("starting sonar!\n");
