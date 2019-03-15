@@ -14,6 +14,7 @@
 #include "rpi.h"
 #include "pwm.h"
 #include "my-spi.h"
+#include "rpi-thread.h"
 
 
 const int trigger_pin = 12;
@@ -172,6 +173,26 @@ char* rfid_loopback_simple() {
 // 
 // }
 
+void tramp(void* args) {
+	while(1){}
+}
+
+void detect_rfid_card(void* args) {
+	while(1) {
+		// do register manipulation of MIFARE
+		// to check for a card
+		// maybe do critical section protection (DNI)
+		printk("I am checking the RFID card rigt now.\n");
+		delay_ms(1000);
+	}
+}
+
+void update_display(void* args) {
+	while(1) {
+		printk("I am updating the OLED display with information.\n");
+		delay_ms(1000);
+	}
+}
 
 void notmain(void) {
     uart_init();
@@ -180,6 +201,14 @@ void notmain(void) {
 	spi_init();
 	printk("enabled spi0\ninitializing rfid");
 	rfid_init();
+	
+	
+	rpi_fork(tramp, 0);
+	rpi_fork(detect_rfid_card, 0);
+	rpi_fork(update_display, 0);
+	rpi_thread_start(1);
+	
+	
 	// // printk("putting soft reset cmd to spi0\n");
 	// // spi_putc((unsigned long)0b1111);
 	// // printk("putting gen rand ID cmd to spi0\n");
@@ -222,7 +251,9 @@ void notmain(void) {
 	printk("setting up transcieve mode\n");
 	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_TRANSCEIVE);
 	rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
-	for(int i=0; i<200; i++) {
+	// like 3 more things
+	// clear IRQ e.g.
+	for(int i=0; i<100; i++) {
 		printk(
 			"rfid_read_reg(REG_COLL) & 0b11111 = %b\n",
 			rfid_read_reg(REG_COLL) & 0b11111

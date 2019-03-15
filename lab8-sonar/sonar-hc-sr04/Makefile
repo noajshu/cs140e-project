@@ -2,15 +2,33 @@
 # 	http://scottmcpeak.com/autodepend/autodepend.html
 
 NAME=sonar
-OBJS = $(NAME).o $(LIBPI_PATH)/cs140e-start.o
+
+TH=../../lab9-threads/code
+TI=  ../../lab7-interrupts/timer-int
+OBJS = $(NAME).o $(LIBPI_PATH)/cs140e-start.o $(TH)/rpi-thread.o $(TH)/thread-asm.o $(TI)/interrupts-asm.o	\
+	$(TI)/interrupts-c.o	\
+	$(TI)/cstart.o		\
+	$(TI)/timer-interrupt.o
+	# $(TI)/start.o		\
+
 
 ifndef LIBPI_PATH
-$(error LIBPI_PATH is not set: this should contain the absolute path to where this directory is.  Define it in your shell's initialiation.  For example, .tcshrc for tcsh or .bashrc for bash)
+$(error "LIBPI_PATH is not set: this should contain the absolute path to where this directory is.  Define it in your shell's initialiation.  For example, .tcshrc for tcsh or .bashrc for bash")
 endif
 
 # useful set of defines.
 include $(LIBPI_PATH)/includes.mk
 
+# 
+# OBJS = $(NAME).o 		\
+# 	rpi-thread.o\
+# 	thread-asm.o\
+# 	$(TI)/interrupts-asm.o	\
+# 	$(TI)/interrupts-c.o	\
+# 	$(TI)/cstart.o		\
+# 	$(TI)/start.o		\
+# 	$(TI)/timer-interrupt.o
+CFLAGS += -I$(TH) -I$(TI)
 all: libpi $(NAME).bin
 
 # is there a better way to do this?

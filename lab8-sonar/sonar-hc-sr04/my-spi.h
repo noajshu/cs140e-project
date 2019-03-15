@@ -32,6 +32,7 @@ void spi_init() {
     // unsigned ra=GET32(AUX_ENABLES);
     // ra|=2; //enable spi0
     // PUT32(AUX_ENABLES,ra);
+
     // GPIO Alternate Functions
     // Table 6.2 on page 102 of BCM2835 ARM Peripherals manual
     // ALT0 = SPI0_CE1_N on GPIO7
@@ -54,24 +55,3 @@ void spi_init() {
     spi0->CLK = 0; // divisor is 65536
     return;
 }
-
-
-unsigned long spi_getc() {
-    spi0->CS = 0x004000B0;
-    while (!((1 << 16) & spi0->CS)) {} // DONE
-    while (!((1 << 17) & spi0->CS)) {} // RXD
-    unsigned long data = spi0->FIFO;
-    spi0->CS = 0x00400000;
-    return data;
-}
-
-
-void spi_putc(unsigned long c) {
-    spi0->CS = 0x004000B0;
-    while (!((1 << 18) & spi0->CS)) {} // TXD
-    spi0->FIFO = c;
-    while (!((1 << 16) & spi0->CS)) {} // DONE
-    spi0->CS = 0x00400000;
-    return;
-}
-
