@@ -19,11 +19,11 @@ void install_int_handlers(void) {
                 dst[i] = src[i];
 }
 
-void interrupt_vector(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
+void interrupt_vector(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_next_thread_sp, unsigned int* prev_thread_sp) {
 	// defined by the client.
     printk("inside interrupt_vector\n");
-	void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp);
-  	int_handler(prev_thread_sp, next_thread_sp);
+	void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_next_thread_sp, unsigned int* prev_thread_sp);
+  	int_handler(addr_of_prev_thread_sp, addr_of_next_thread_sp, prev_thread_sp);
 }
 
 #define UNHANDLED(msg,r) \

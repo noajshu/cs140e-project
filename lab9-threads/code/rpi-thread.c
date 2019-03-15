@@ -96,7 +96,7 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
-void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
+void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_next_thread_sp, unsigned prev_thread_sp) {
     /*Code here should decide whether to preempt or not and to which 
     thread to preempt to*/
 	printk("in int_handler\n");
@@ -123,6 +123,9 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 		// printk("switching off irq\n");
 		RPI_GetArmTimer()->IRQClear = 1;
 		//return if we should preempt or not
+		int* addr = (void*)0x100000;
+		printk("Addr is %d\n", *addr);
+		previous_thread->sp = prev_thread_sp;
 		printk(
 			"previous_thread # %x, next thread @ %x\n",
 			previous_thread,
@@ -134,8 +137,8 @@ void int_handler(unsigned int* prev_thread_sp, unsigned int* next_thread_sp) {
 			cur_thread->sp
 		);
 		printk("switching to thread %d\n", cur_thread->tid);
-		*prev_thread_sp = (uint32_t)&(previous_thread->sp);
-		*next_thread_sp = (uint32_t)&(cur_thread->sp);
+		*addr_of_prev_thread_sp = (uint32_t)&(previous_thread->sp);
+		*addr_of_next_thread_sp = (uint32_t)&(cur_thread->sp);
 
 		previous_thread->sp -= 64/4;
 		cur_thread->sp += 64/4;

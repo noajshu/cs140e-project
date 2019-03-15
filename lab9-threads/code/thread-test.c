@@ -100,24 +100,25 @@ void part2(void) {
 
 volatile unsigned count = 0;
 static void increase_mem_by_one(void* arg){
-	while(count < 100000){
-		//int* int_addr = (int*)arg;
-	    //*int_addr = 1;
+	volatile int* int_addr = (int*)arg;
+	while(1){
+	    *int_addr += 1;
 		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 		//*int_addr = 0;
-	    delay_ms(3000);
-		count++;
-    }
-	count = 0;
+	    //delay_ms(3000);
+	    //printk("ADDR value %d\n", *int_addr);
+	}
+	//printk("Thread %d finished!\n", rpi_cur_thread()->tid);
 }
 
 void preemptive_thread_increase(void) {
     printk("Running write to one memory address of code %x\n", increase_mem_by_one);
     int n = 4;
     int* addr = (void*)0x100000;
+    *addr = 0;
     for(int i= 0; i<n; i++) {
-    	//rpi_fork(increase_mem_by_one, (void*)addr);
-		rpi_fork(reggie1234, (void*)addr);
+    	rpi_fork(increase_mem_by_one, (void*)addr);
+		//rpi_fork(reggie1234, (void*)addr);
     }
     rpi_thread_start(1);
     printk("Addr value is %d\n", *addr);
