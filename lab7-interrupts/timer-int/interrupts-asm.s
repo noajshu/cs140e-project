@@ -91,7 +91,9 @@ interrupt_asm:
   sub sp, sp, #4
   mov r1, sp
   
+  push {r0-r12, lr}
   bl  interrupt_vector 
+  pop {r0-r12, lr}
 
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
@@ -100,9 +102,6 @@ interrupt_asm:
   ldr r0, [r0]
   sub r0, r0, #64
   ldr r1, [r1]
-  push {r0-r12, lr}
-  @bl check_regs
-  pop {r0-r12, lr}
 
   @pop the reg values of the prev thread one by one 
   @and store them in the prev thread stack
@@ -135,29 +134,21 @@ interrupt_asm:
   pop {r3} //pc
   str r3, [r1, #52]
 
-  sub sp, sp, #4
-  ldm sp, {lr}^ //lr of prev thread
-  pop {r3}
-  str r3, [r1, #56]
+  add r3, r1, #56
+  stm r3, {lr}^
 
   mrs r3, spsr   //cpsr of prev thread
   str r3, [r1, #60]
-  push {r0-r12, lr}
-  @bl check_regs
-  pop {r0-r12, lr}
-  @restore next reg values
 
+  @restore next reg values
   mov sp, r0
 
   @update the spsr
   ldr r0, [sp, #60]
   msr spsr, r0
-  push {r0-r12, lr}
-  @bl check_regs
-  pop {r0-r12, lr}
 
   add r0, sp, #56
-  stm r0, {lr}^
+  ldm r0, {lr}^ @lr for future function
 
   pop {r0-r12, lr}
   add sp, sp, #8
@@ -171,6 +162,25 @@ do_not_preempt:
    mov r0, lr
    bl check_regs
    movs pc, lr
+
+  @update the spsr
+  @ldr r0, [sp, #60]
+  @msr spsr, r0
+
+  @add r0, sp, #52
+  @stm r0, {lr}^
+
+  @ldr lr, [sp, #56]
+
+  @pop {r0-r12}
+
+  @add sp, sp, #12
+
+
+  @__________________
+
+
+
 
 
 

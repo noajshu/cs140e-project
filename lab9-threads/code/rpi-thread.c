@@ -34,7 +34,8 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	// stack offsets, change them!
 	enum { 
 		// register offsets are in terms of byte offsets!
-		LR_offset = 52/4,  
+		LR_offset = 52/4,
+		Ret_offset = 56/4,  
 		CPSR_offset = 60/4,
 		R0_offset = 0, 
 		R1_offset = 4/4, 
@@ -47,6 +48,7 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	t->sp = &t->stack[sizeof(t->stack)/sizeof(t->stack[0]) -1];
 	t->sp -= 64/4;
 	t->sp[LR_offset] = (uint32_t)rpi_init_trampoline;
+	t->sp[Ret_offset] = (uint32_t)rpi_init_trampoline + 4;
 	t->sp[R1_offset] = (uint32_t)code;
 	t->sp[R0_offset] = (uint32_t)arg;
 	t->sp[CPSR_offset] = rpi_get_cpsr();
@@ -116,7 +118,9 @@ void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_nex
 			return;
 		}
 		
-		Q_append(&runq, previous_thread);
+		if(previous_thread->tid != 0) {
+			Q_append(&runq, previous_thread);
+		}
 		/* Clear the ARM Timer interrupt - it's the only interrupt 
 		* we have enabled, so we want don't have to work out which 
 		* interrupt source caused us to interrupt */
@@ -125,23 +129,23 @@ void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_nex
 		//return if we should preempt or not
 		int* addr = (void*)0x100000;
 		printk("Addr is %d\n", *addr);
-		previous_thread->sp = prev_thread_sp;
+		cur_thread->sp = cur_thread->sp + 64/4;
 		printk(
-			"previous_thread # %x, next thread @ %x\n",
-			previous_thread,
-			cur_thread
-		);
-		printk(
-			"previous_thread sp %x, next thread sp %x\n",
+			"previous_thread sp original %x, after code %x, next thread sp %x\n",
 			previous_thread->sp - 64/4,
+			prev_thread_sp,
 			cur_thread->sp
 		);
+		if(cur_thread->tid == 0){
+			previous_thread->sp += 64/4;
+	    } else {
+	    	previous_thread->sp = prev_thread_sp;
+	    }
+	    previous_thread->sp = previous_thread->sp - 64/4;
+
 		printk("switching to thread %d\n", cur_thread->tid);
 		*addr_of_prev_thread_sp = (uint32_t)&(previous_thread->sp);
 		*addr_of_next_thread_sp = (uint32_t)&(cur_thread->sp);
-
-		previous_thread->sp -= 64/4;
-		cur_thread->sp += 64/4;
 	}
 }
 
