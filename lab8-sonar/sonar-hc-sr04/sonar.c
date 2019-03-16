@@ -14,6 +14,7 @@
 #include "rpi.h"
 #include "pwm.h"
 #include "my-spi.h"
+#include "spi02.h"
 #include "rpi-thread.h"
 
 
@@ -95,6 +96,7 @@ void rfid_init() {
 		gpio_set_output(25);
 		gpio_write(25, 1);
 		delay_ms(50);
+		gpio_write(25, 0);
 	}
 	rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b11) | 0b11);
 }
@@ -201,13 +203,15 @@ void notmain(void) {
 	spi_init();
 	printk("enabled spi0\ninitializing rfid");
 	rfid_init();
+	oled_init();
+    show_text(0,"HELLO");
+    show_text(1,"world!");
 	
-	
-	rpi_fork(tramp, 0);
-	rpi_fork(detect_rfid_card, 0);
-	rpi_fork(update_display, 0);
-	rpi_thread_start(1);
-	
+	// rpi_fork(tramp, 0);
+	// rpi_fork(detect_rfid_card, 0);
+	// rpi_fork(update_display, 0);
+	// rpi_thread_start(1);
+	// 
 	
 	// // printk("putting soft reset cmd to spi0\n");
 	// // spi_putc((unsigned long)0b1111);
