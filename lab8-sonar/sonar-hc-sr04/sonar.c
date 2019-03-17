@@ -27,6 +27,10 @@ int distance_in_cm(int t1) {
 	return t1/58;
 }
 
+enum picc_cmds {
+	PICC_CMD_WUPA = 0x52,
+};
+
 enum rfid_cmds {
 	CMD_GEN_RANDOM_ID = 0b0010,
 	CMD_IDLE = 0,
@@ -45,6 +49,7 @@ enum rfid_regs {
 	REG_FIFO_LEVEL = 0x0A,
 	REG_MODE = 0x11,
 	REG_TXCTL = 0x14,
+	REG_BIT_FRAMING = 0x0d,
 	REG_COLL = 0x0e,
 	REG_TMODE = 0x2a,
 };
@@ -94,9 +99,9 @@ char rfid_read_reg(char reg) {
 	char msg[2];
 	msg[0] = REG_READ | (reg << 1);
 	msg[1] = 0;
-	char out[1];
-	rfid_transaction(msg, out, 2, 1);
-	return out[0];
+	char out[2];
+	rfid_transaction(msg, out, 2, 2);
+	return out[1];
 }
 
 #define RFID_RESET_PIN 5
@@ -141,13 +146,14 @@ void rfid_loopback_regs(char*buf) {
 	while (i<strlen(message)) {
 		rfid_write_reg(REG_FIFO_DATA, message[i]);
 		i++;
+		// printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
 	}
 	buf[i]=0;
-	printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
+	// printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
 	i=0;
 	unsigned level = rfid_read_reg(REG_FIFO_LEVEL) & 0b01111111;
 	while(i < level) {
-		printk("reading from FIFO");
+		// printk("reading from FIFO\n");
 		buf[i] = rfid_read_reg(REG_FIFO_DATA);
 		i++;
 	}
@@ -245,7 +251,7 @@ void notmain(void) {
 	char buf2[100];
 	rfid_loopback_regs(buf2);
 	printk("rfid_loopback_regs = %s\n", buf2);
-	clean_reboot();
+	// clean_reboot();
 
 	printk(
 		"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
@@ -254,20 +260,22 @@ void notmain(void) {
 
 
 	printk("setting up transcieve mode\n");
-	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
-	rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) | 0x80);
-	rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
-	// so that the timer starts immediately after transmitting
-	rfid_write_reg(REG_TMODE, 0x80);
-	// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~0b);
-	show_text_hex(0, rfid_read_reg(REG_MODE));
-	// like 3 more things
-	// clear IRQ e.g.
 	for(int i=0; i<100; i++) {
-		rfid_write_reg(
-			REG_CMD,
-			(rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE
-		);
+		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
+		rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
+		rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
+		// so that the timer starts immediately after transmitting
+		rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~(1<<5));
+		// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~0b);
+		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
+		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
+		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
+		show_text_hex(0, rfid_read_reg(REG_MODE));
+		// like 3 more things
+		// clear IRQ e.g.
+		rfid_write_reg(REG_BIT_FRAMING, (rfid_read_reg(REG_BIT_FRAMING) &  ~0b111) | 7);
+		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
+		rfid_write_reg(REG_BIT_FRAMING, rfid_read_reg(REG_BIT_FRAMING) | (1<<7));
 		printk(
 			"rfid_read_reg(REG_COLL) = %b\n",
 			rfid_read_reg(REG_COLL)
@@ -287,6 +295,18 @@ void notmain(void) {
 		printk(
 			"rfid_read_reg(REG_CMD) = %b\n",
 			rfid_read_reg(REG_CMD)
+		);
+		printk(
+			"rfid_read_reg(REG_ERROR) = %b\n",
+			rfid_read_reg(REG_ERROR)
+		);
+		printk(
+			"rfid_read_reg(REG_TMODE) = %b\n",
+			rfid_read_reg(REG_TMODE)
+		);
+		printk(
+			"rfid_read_reg(REG_MODE) = %b\n",
+			rfid_read_reg(REG_MODE)
 		);
 		show_text_hex(0, rfid_read_reg(REG_STATUS1));
 		show_text_hex(1, rfid_read_reg(REG_STATUS2));
