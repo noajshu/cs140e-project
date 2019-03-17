@@ -35,7 +35,7 @@ rpi_get_cpsr:
 .globl rpi_cswitch
 .extern printk
 rpi_cswitch:
-	add sp, #-64
+	sub sp, sp, #64
 
     str r0, [sp]
     str r1, [sp, #4]
@@ -81,10 +81,6 @@ rpi_cswitch:
 	ldr r14, [sp, #52]
 
 	add sp, sp, #64
-	mov r3, sp
-	push {r0-r12, lr}
-    bl check_regs
-    pop {r0-r12, lr}
 
 	mov pc, lr
 
