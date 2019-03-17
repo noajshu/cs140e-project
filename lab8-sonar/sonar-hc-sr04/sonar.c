@@ -16,6 +16,7 @@
 #include "my-spi.h"
 #include "spi02.h"
 #include "rpi-thread.h"
+#include "MFRC522.h"
 
 
 const int trigger_pin = 12;
@@ -26,7 +27,6 @@ int distance_in_cm(int t1) {
 	return t1/58;
 }
 
-
 enum rfid_cmds {
 	CMD_GEN_RANDOM_ID = 0b0010,
 	CMD_IDLE = 0,
@@ -34,11 +34,19 @@ enum rfid_cmds {
 };
 enum rfid_regs {
 	REG_CMD = 0x01,
+	REG_COMIEN = 0x02,
+	REG_DIVIEN = 0x03,
+	REG_COM_IRQ = 0x04,
+	REG_DIV_IRQ = 0x05,
+	REG_ERROR = 0x06,
+	REG_STATUS1 = 0x07,
+	REG_STATUS2 = 0x08,
 	REG_FIFO_DATA = 0x09,
 	REG_FIFO_LEVEL = 0x0A,
+	REG_MODE = 0x11,
 	REG_TXCTL = 0x14,
 	REG_COLL = 0x0e,
-	REG_STATUS2 = 0x08,
+	REG_TMODE = 0x2a,
 };
 enum rfid_regs_access_modes {
 	REG_WRITE = 0 << 7,
@@ -48,7 +56,8 @@ enum rfid_regs_access_modes {
 // k = expected number of send bytes
 // n = expected number of received bytes
 void rfid_transaction(char* inbuf, char* outbuf, unsigned k, unsigned n) {
-	spi0->CS = 0xB0;
+	chip_select(1);
+	transfer_active(1);
 	// CLEAR RX FIFO (this will discard any data inside)
 	while(((1 << 17) & spi0->CS)) {
 		char junk = spi0->FIFO;
@@ -82,78 +91,29 @@ void rfid_write_reg(char reg, char val) {
 }
 
 char rfid_read_reg(char reg) {
-	char msg = REG_READ | (reg << 1);
+	char msg[2];
+	msg[0] = REG_READ | (reg << 1);
+	msg[1] = 0;
 	char out[1];
-	rfid_transaction(&msg, out, 1, 1);
+	rfid_transaction(msg, out, 2, 1);
 	return out[0];
 }
 
-
+#define RFID_RESET_PIN 5
 void rfid_init() {
 	// check if we need are in "power down" mode
-	gpio_set_input(25);
-	if(!gpio_read(25)) {
-		gpio_set_output(25);
-		gpio_write(25, 1);
+	gpio_set_input(RFID_RESET_PIN);
+	if(!gpio_read(RFID_RESET_PIN)) {
+		gpio_set_output(RFID_RESET_PIN);
+		gpio_write(RFID_RESET_PIN, 1);
 		delay_ms(50);
-		gpio_write(25, 0);
+		gpio_write(RFID_RESET_PIN, 0);
 	}
-	rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b11) | 0b11);
 }
 
-
-void rfid_loopback(char* fifo_data) {
-
-	spi0->CS = 0xB0;
-	
-	// set command to gen random id
-	while (!((1 << 18) & spi0->CS)) {} // TXD
-	spi0->FIFO = ((REG_WRITE | (REG_CMD << 1)) &0xFF);
-	spi0->FIFO = (CMD_GEN_RANDOM_ID &0xFF);
-	while (!((1 << 16) & spi0->CS)) {} // DONE
-	while (!((1 << 17) & spi0->CS)) {} // RXD
-	while (((1 << 17) & spi0->CS)) {
-		printk("spi0->FIFO = %x\n", spi0->FIFO);
-	}
-	
-	delay_ms(10);
-
-	// write to the RFID fifo just for fun
-	while (!((1 << 18) & spi0->CS)) {} // TXD
-	spi0->FIFO = ((REG_WRITE | (REG_FIFO_DATA << 1)) &0xFF);
-	char* msg = "hello from mifare device";
-	for(int i=0; i < 24; i++) {
-		spi0->FIFO = (msg[i] &0xFF);
-	}
-
-
-	// read from the RFID fifo
-	while (!((1 << 18) & spi0->CS)) {} // TXD
-	spi0->FIFO = ((REG_READ | (REG_FIFO_LEVEL << 1)) &0xFF);
-	while (!((1 << 17) & spi0->CS)) {} // RXD
-	unsigned fifo_level = spi0->FIFO;
-	for(unsigned i=0; i<fifo_level; i++) {
-		spi0->FIFO = ((REG_READ | (REG_FIFO_DATA << 1)) &0xFF);
-	}
-	while (!((1 << 16) & spi0->CS)) {} // DONE
-	while (!((1 << 17) & spi0->CS)) {} // RXD
-	int j=0;
-	while (((1 << 17) & spi0->CS) && j < 100) {
-		fifo_data[j] = spi0->FIFO;
-		printk("fifo_data[j] = %x\n", fifo_data[j]);
-		j++;
-	}
-	fifo_data[j] = 0;
-	spi0->CS = 0x0;
-
-	return;
-}
-
-
-char* rfid_loopback_simple() {
+void rfid_loopback_simple(char*buf) {
 	char* message = "  hello simple from mifare device!!";
 	message[0] = REG_WRITE | (REG_FIFO_DATA << 1);
-	char buf[100];
 	// put message in fifo
 	printk("putting message in fifo\n");
 	rfid_transaction(message, (void*)0, strlen(message), 0);
@@ -162,18 +122,39 @@ char* rfid_loopback_simple() {
 	for(unsigned i=0; i<100; i++)
 		readcmd[i] = REG_READ | (REG_FIFO_DATA << 1);
 	rfid_transaction(readcmd, buf, strlen(message), strlen(message));
-
-	return message;
+	buf[strlen(message)] = 0;
+	return;
 }
 
-// 
-// 0b00100110
-// 0010
-// void write_
-// unsigned CMD_REQ = 
-// int cards_nearby() {
-// 
-// }
+void rfid_loopback_regs(char*buf) {
+	char* message = "hello simple from mifare device!!";
+	// message[0] = REG_WRITE | (REG_FIFO_DATA << 1);
+	// // put message in fifo
+	// printk("putting message in fifo\n");
+	// rfid_transaction(message, (void*)0, strlen(message), 0);
+	// // retrive message from fifo
+	// char readcmd[100];
+	// for(unsigned i=0; i<100; i++)
+	// 	readcmd[i] = REG_READ | (REG_FIFO_DATA << 1);
+	// rfid_transaction(readcmd, buf, strlen(message), strlen(message));
+	unsigned i=0;
+	while (i<strlen(message)) {
+		rfid_write_reg(REG_FIFO_DATA, message[i]);
+		i++;
+	}
+	buf[i]=0;
+	printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
+	i=0;
+	unsigned level = rfid_read_reg(REG_FIFO_LEVEL) & 0b01111111;
+	while(i < level) {
+		printk("reading from FIFO");
+		buf[i] = rfid_read_reg(REG_FIFO_DATA);
+		i++;
+	}
+	buf[i]=0;
+	return;
+}
+
 
 void tramp(void* args) {
 	while(1){}
@@ -195,17 +176,30 @@ void update_display(void* args) {
 		delay_ms(1000);
 	}
 }
+void oled_reset(void) {
+	#define OLED_RST_PIN 6
+	gpio_set_output(OLED_RST_PIN);
+	gpio_write(OLED_RST_PIN, 1);
+	delay_ms(50);
+	gpio_write(OLED_RST_PIN, 0);
+	delay_ms(50);
+	gpio_write(OLED_RST_PIN, 1);
+	delay_ms(50);
+}
 
 void notmain(void) {
     uart_init();
 
 	printk("enabling spi0\n");
 	spi_init();
-	printk("enabled spi0\ninitializing rfid");
+	printk("initializing rfid\n");
 	rfid_init();
+	printk("initializing oled\n");
+	oled_reset();
 	oled_init();
     show_text(0,"HELLO");
-    show_text(1,"world!");
+    show_text(1,"noah!");
+	
 	
 	// rpi_fork(tramp, 0);
 	// rpi_fork(detect_rfid_card, 0);
@@ -244,32 +238,60 @@ void notmain(void) {
 	// char fifo_data[100];
 	// rfid_loopback(fifo_data);
 	// printk("rfid_loopback = %s\n", fifo_data);
-	// printk("rfid_loopback_simple = %s\n", rfid_loopback_simple());
-
+	
+	char buf1[100];
+	rfid_loopback_simple(buf1);
+	printk("rfid_loopback_simple = %s\n", buf1);
+	char buf2[100];
+	rfid_loopback_regs(buf2);
+	printk("rfid_loopback_regs = %s\n", buf2);
+	clean_reboot();
 
 	printk(
 		"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
 		rfid_read_reg(REG_CMD) & 0b1111
 	);
 
+
 	printk("setting up transcieve mode\n");
-	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_TRANSCEIVE);
-	rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
+	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
+	rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) | 0x80);
+	rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
+	// so that the timer starts immediately after transmitting
+	rfid_write_reg(REG_TMODE, 0x80);
+	// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~0b);
+	show_text_hex(0, rfid_read_reg(REG_MODE));
 	// like 3 more things
 	// clear IRQ e.g.
 	for(int i=0; i<100; i++) {
-		printk(
-			"rfid_read_reg(REG_COLL) & 0b11111 = %b\n",
-			rfid_read_reg(REG_COLL) & 0b11111
+		rfid_write_reg(
+			REG_CMD,
+			(rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE
 		);
 		printk(
-			"rfid_read_reg(REG_STATUS2) & 0b111 = %b\n",
-			rfid_read_reg(REG_STATUS2) & 0b111
+			"rfid_read_reg(REG_COLL) = %b\n",
+			rfid_read_reg(REG_COLL)
 		);
 		printk(
-			"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
-			rfid_read_reg(REG_CMD) & 0b1111
+			"rfid_read_reg(REG_FIFO_LEVEL) = %b\n",
+			rfid_read_reg(REG_FIFO_LEVEL)
 		);
+		printk(
+			"rfid_read_reg(REG_STATUS1) = %b\n",
+			rfid_read_reg(REG_STATUS1)
+		);
+		printk(
+			"rfid_read_reg(REG_STATUS2) = %b\n",
+			rfid_read_reg(REG_STATUS2)
+		);
+		printk(
+			"rfid_read_reg(REG_CMD) = %b\n",
+			rfid_read_reg(REG_CMD)
+		);
+		show_text_hex(0, rfid_read_reg(REG_STATUS1));
+		show_text_hex(1, rfid_read_reg(REG_STATUS2));
+		show_text_hex(2, rfid_read_reg(REG_CMD));
+		show_text_hex(3, rfid_read_reg(REG_COM_IRQ));
 		delay_ms(100);
 	}
 

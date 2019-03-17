@@ -14,6 +14,7 @@ thumb_start_add: .word thumb_start
 .thumb_func
 thumb_start:
     bl notmain
+
 hang: b hang
 
 .thumb_func

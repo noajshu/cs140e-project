@@ -40,6 +40,10 @@ all: libpi $(NAME).bin
 libpi:
 	@make -C $(LIBPI_PATH)
 
+oled:
+	@make -C $(OLED)
+
+
 $(NAME).bin: $(LIBPI_PATH)/memmap $(OBJS)
 	$(LD) $(OBJS) -T $(LIBPI_PATH)/memmap -o $(NAME).elf  $(LPI)
 	$(OD) -D $(NAME).elf > $(NAME).list

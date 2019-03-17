@@ -27,31 +27,40 @@ struct spi_periph {
 };
 volatile struct spi_periph* const spi0 = (struct spi_periph*)0x20204000;
 
-// void spi_init() {
-//     // dwelch enables spi1, but this should not matter
-//     // unsigned ra=GET32(AUX_ENABLES);
-//     // ra|=2; //enable spi0
-//     // PUT32(AUX_ENABLES,ra);
-// 
-//     // GPIO Alternate Functions
-//     // Table 6.2 on page 102 of BCM2835 ARM Peripherals manual
-//     // ALT0 = SPI0_CE1_N on GPIO7
-//     gpio_set_function(7, GPIO_FUNC_ALT0);
-//     // ALT0 = SPI0_CE0_N on GPIO8
-//     gpio_set_function(8, GPIO_FUNC_ALT0);
-//     // ALT0 = SPI0_MISO on GPIO9
-//     gpio_set_function(9, GPIO_FUNC_ALT0);
-//     // ALT0 = SPI0_MOSI on GPIO10
-//     gpio_set_function(10, GPIO_FUNC_ALT0);
-//     // ALT0 = SPI0_SCLK on GPIO11
-//     gpio_set_function(11, GPIO_FUNC_ALT0);
-// 
-//     // printk("spi0->CS = %b\n", spi0->CS);
-//     // printk("get32(0x20204000) = %b\n", get32(0x20204000));
-//     // ENABLE SPI0
-//     spi0->CS = 0x0000030;
-//     // spi0->CS.SBZ = 0;
-//     // spi0->CS.CLEAR = 0b11;
-//     spi0->CLK = 0; // divisor is 65536
-//     return;
-// }
+void chip_select(unsigned char chip) {
+    // printk("selecting chip %b\n", chip);
+    demand(chip <= 2, "only support chip select 0, 1, or 2");
+    spi0->CS = chip | (spi0->CS & ~0b11);
+}
+
+void transfer_active(unsigned char TA) {
+    demand(TA <= 1, "TA = 1 or 0");
+    spi0->CS = (TA << 7) | (spi0->CS & ~(0b1 << 7));
+}
+
+// for convenience of build,
+// we use Dwelch's spi init function.
+// This one works too though.
+void my_spi_init() {
+    // dwelch enables spi1, but this should not matter
+    // unsigned ra=GET32(AUX_ENABLES);
+    // ra|=2; //enable spi0
+    // PUT32(AUX_ENABLES,ra);
+
+    // GPIO Alternate Functions
+    // Table 6.2 on page 102 of BCM2835 ARM Peripherals manual
+    // ALT0 = SPI0_CE1_N on GPIO7
+    gpio_set_function(7, GPIO_FUNC_ALT0);
+    // ALT0 = SPI0_CE0_N on GPIO8
+    gpio_set_function(8, GPIO_FUNC_ALT0);
+    // ALT0 = SPI0_MISO on GPIO9
+    gpio_set_function(9, GPIO_FUNC_ALT0);
+    // ALT0 = SPI0_MOSI on GPIO10
+    gpio_set_function(10, GPIO_FUNC_ALT0);
+    // ALT0 = SPI0_SCLK on GPIO11
+    gpio_set_function(11, GPIO_FUNC_ALT0);
+
+    // ENABLE SPI0
+    spi0->CLK = 0; // divisor is 65536
+    return;
+}
