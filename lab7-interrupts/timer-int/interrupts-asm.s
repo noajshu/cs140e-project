@@ -76,24 +76,27 @@ reggie1234:
 @ only handler that should run since we only enable general interrupts
 interrupt_asm:
   @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
-  mov r2, sp
+  push {sp}
+  ldm sp, {sp}^ 
 
   mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
+
   sub   lr, lr, #4
   push {r0-r12, lr}
 
-  @ldr r0, =0x100000
-  @cmp r0, #0
-  @bne do_not_preempt
+  bl check_dni
+  cmp r0, #1
+  beq do_not_preempt
 
   sub sp, sp, #4
   mov r0, sp 
   sub sp, sp, #4
   mov r1, sp
-  
-  push {r0-r12, lr}
+  sub sp, sp, #4
+  stm sp, {sp}^
+  pop {r2}
+
   bl  interrupt_vector 
-  pop {r0-r12, lr}
 
   @r0 has addr for sp of next thread
   @r1 has addr of sp of prev thread
@@ -140,6 +143,15 @@ interrupt_asm:
   mrs r3, spsr   //cpsr of prev thread
   str r3, [r1, #60]
 
+  push {r0-r12, lr}
+  mov r4, r1
+  ldr r0, [r4]
+  ldr r1, [r4, #4]
+  ldr r2, [r4, #8]
+  ldr r3, [r4, #12]
+  @bl check_regs
+  pop {r0-r12, lr}
+
   @restore next reg values
   mov sp, r0
 
@@ -150,18 +162,34 @@ interrupt_asm:
   add r0, sp, #56
   ldm r0, {lr}^ @lr for future function
 
+  mov r4, sp
+  push {r0-r12, lr}
+  ldr r0, [r4]
+  ldr r1, [r4, #4]
+  ldr r2, [r4, #8]
+  ldr r3, [r4, #12]
+  @bl check_regs
+  pop {r0-r12, lr}
+
   pop {r0-r12, lr}
   add sp, sp, #8
+
   movs pc, lr   @ moves the link register into the pc and implicitly
                 @ loads the PC with the result, then copies the 
                 @ SPSR to the CPSR.
 
 
 do_not_preempt:
-   pop {r0-r12, lr}
-   mov r0, lr
-   bl check_regs
-   movs pc, lr
+  push {r0-r12, lr}
+  bl clear_arm_timer_interrupt
+  pop {r0-r12, lr}
+
+  pop {r0-r12, lr}
+  sub sp, sp, #4
+  stm sp, {sp}^
+  ldr sp, [sp]
+
+  movs pc, lr
 
   @update the spsr
   @ldr r0, [sp, #60]

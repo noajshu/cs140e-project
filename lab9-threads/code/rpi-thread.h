@@ -23,6 +23,9 @@ void rpi_thread_start(int preemptive_p);
 //	- note: if pre-emptive is enabled this can change underneath you!
 rpi_thread_t *rpi_cur_thread(void);
 
+void enable_dni(void);
+void disable_dni(void);
+
 // context-switch:
 //      - after saving state, write value of sp to <sp_old>
 //      - switch to <sp_new> and restore values.
