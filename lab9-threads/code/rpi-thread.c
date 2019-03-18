@@ -35,9 +35,9 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	// stack offsets, change them!
 	enum { 
 		// register offsets are in terms of byte offsets!
-		LR_offset = 52/4,
+		LR_offset = 60/4,
 		Ret_offset = 56/4,  
-		CPSR_offset = 60/4,
+		CPSR_offset = 52/4,
 		R0_offset = 0, 
 		R1_offset = 4/4, 
 	};

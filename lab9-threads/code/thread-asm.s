@@ -50,10 +50,10 @@ rpi_cswitch:
 	str r10, [sp, #40]
 	str r11, [sp, #44]
 	str r12, [sp, #48]
-	str r14, [sp, #52]
+	str r14, [sp, #60]
 	str r15, [sp, #56]
 	mrs r2, cpsr
-	str r2, [sp, #60]
+	str r2, [sp, #52]
 
 	@store the value of the sp for the 
 	@previous context into r0 (old context sp)
@@ -64,7 +64,7 @@ rpi_cswitch:
 	ldr sp, [r1]
 
 	ldr r0, [sp]
-	ldr r1, [sp, #60]
+	ldr r1, [sp, #52]
 	msr cpsr, r1
 	ldr r1, [sp, #4]
 	ldr r2, [sp, #8]
@@ -78,7 +78,7 @@ rpi_cswitch:
 	ldr r10, [sp, #40]
 	ldr r11, [sp, #44]
 	ldr r12, [sp, #48]
-	ldr r14, [sp, #52]
+	ldr r14, [sp, #60]
 
 	add sp, sp, #64
 

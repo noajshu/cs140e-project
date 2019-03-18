@@ -73,6 +73,48 @@ reggie1234:
   b reggie1234
 
 
+
+exp_interrupt_asm:
+push {sp}
+ldm sp, {sp}^ 
+@get our new stack pointer
+mov sp, #0x9000000
+@subtract 4 from lr to get the pc
+sub lr, lr, #4
+@save it to the irq stack
+push {lr}
+
+@Check the DNI flag
+bl check_dni
+cmp r0, #1
+beq do_not_preempt
+
+sub sp, sp, #4
+mov r0, sp 
+sub sp, sp, #4
+stm sp, {sp}^
+pop {r2}
+
+bl  interrupt_vector 
+
+msr cpsr_c, #0x13
+stmfa sp!, {r0-r12, lr}
+push {r0-r12, lr}
+mov r0, sp
+bl check_regs
+pop {r0-r12, lr}
+msr cpsr_c, #0x12
+
+msr cpsr_c, #0x13
+mov r0, #0x9000000
+ldr sp, [r0, #-8]
+ldmfa sp!, {r0-r12, lr}
+msr cpsr_c, #0x12
+
+pop {r0}
+ldmfa sp!, {pc}^
+
+
 @ only handler that should run since we only enable general interrupts
 interrupt_asm:
   @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
@@ -135,48 +177,28 @@ interrupt_asm:
   pop {r3} //r12
   str r3, [r1, #48]
   pop {r3} //pc
-  str r3, [r1, #52]
+  str r3, [r1, #60]
+  
+  cps #0x13
+  mov r3, lr
+  cps #0x12
 
-  add r3, r1, #56
-  stm r3, {lr}^
+  str r3, [r1, #56]
 
   mrs r3, spsr   //cpsr of prev thread
-  str r3, [r1, #60]
-
-  push {r0-r12, lr}
-  mov r4, r1
-  ldr r0, [r4]
-  ldr r1, [r4, #4]
-  ldr r2, [r4, #8]
-  ldr r3, [r4, #12]
-  @bl check_regs
-  pop {r0-r12, lr}
+  str r3, [r1, #52]
 
   @restore next reg values
   mov sp, r0
 
   @update the spsr
-  ldr r0, [sp, #60]
+  ldr r0, [sp, #52]
   msr spsr, r0
 
-  add r0, sp, #56
-  ldm r0, {lr}^ @lr for future function
-
-  mov r4, sp
-  push {r0-r12, lr}
-  ldr r0, [r4]
-  ldr r1, [r4, #4]
-  ldr r2, [r4, #8]
-  ldr r3, [r4, #12]
-  @bl check_regs
-  pop {r0-r12, lr}
-
-  pop {r0-r12, lr}
-  add sp, sp, #8
-
-  movs pc, lr   @ moves the link register into the pc and implicitly
-                @ loads the PC with the result, then copies the 
-                @ SPSR to the CPSR.
+  pop {r0-r12}
+  add sp, sp, #4
+  ldmfd sp!, {lr}
+  ldmfd sp!, {pc}^ @also moves spsr to cpsr
 
 
 do_not_preempt:

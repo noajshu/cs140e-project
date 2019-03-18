@@ -105,9 +105,9 @@ static void increase_mem_by_one(void* arg){
 	    *int_addr += 1;
 		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 		//*int_addr = 0;
-	    enable_dni();
-	    delay_ms(10000);
-	    disable_dni();
+	    //enable_dni();
+	    delay_ms(1000);
+	    //disable_dni();
 
 	    //printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 	    //printk("ADDR value %d\n", *int_addr);
