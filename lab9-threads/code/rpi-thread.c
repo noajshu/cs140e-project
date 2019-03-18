@@ -6,6 +6,7 @@
 #define E rpi_thread_t
 #include "Q.h"
 
+int* dni_addr = (int*)0x9000000;
 static struct Q runq, freeq;
 static unsigned nthreads;
 
@@ -124,9 +125,8 @@ void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_nex
 		/* Clear the ARM Timer interrupt - it's the only interrupt 
 		* we have enabled, so we want don't have to work out which 
 		* interrupt source caused us to interrupt */
-		// printk("switching off irq\n");
 		RPI_GetArmTimer()->IRQClear = 1;
-		//return if we should preempt or not
+
 		int* addr = (void*)0x100000;
 		printk("Addr is %d\n", *addr);
 		cur_thread->sp = cur_thread->sp + 64/4;
@@ -164,6 +164,7 @@ void rpi_thread_start(int preemptive_p) {
 	if(!cur_thread) return;
 
 	if(preemptive_p) {
+		*dni_addr = 0;
 	   install_int_handlers();
 	   //timer_interrupt_init(0x4); // 4 cycles
 	   timer_interrupt_init(7000); // about 3 seconds
@@ -190,6 +191,23 @@ void rpi_thread_start(int preemptive_p) {
 //	- note: if pre-emptive is enabled this can change underneath you!
 rpi_thread_t *rpi_cur_thread(void) {
 	return cur_thread;
+}
+
+void enable_dni(){
+   *dni_addr = 1;
+}
+
+void disable_dni(){
+	*dni_addr = 0;
+}
+
+void clear_arm_timer_interrupt(){
+	RPI_GetArmTimer()->IRQClear = 1;
+}
+
+int check_dni() {
+	if(rpi_cur_thread()->tid == 0) return 0;
+	return *dni_addr;
 }
 
 // call this an other routines from assembler to print out different

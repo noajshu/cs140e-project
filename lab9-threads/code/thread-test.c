@@ -103,12 +103,16 @@ static void increase_mem_by_one(void* arg){
 	volatile int* int_addr = (int*)arg;
 	while(*int_addr < 100000000){
 	    *int_addr += 1;
-		//printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 		//*int_addr = 0;
-	    //delay_ms(2000);
+	    enable_dni();
+	    delay_ms(10000);
+	    disable_dni();
+
+	    //printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 	    //printk("ADDR value %d\n", *int_addr);
 	}
-	printk("Thread %d finished!\n", rpi_cur_thread()->tid);
+	//printk("Thread %d finished!\n", rpi_cur_thread()->tid);
 }
 
 void preemptive_thread_increase(void) {
