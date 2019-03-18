@@ -28,7 +28,8 @@ int distance_in_cm(int t1) {
 }
 
 enum picc_cmds {
-	PICC_CMD_WUPA = 0x52,
+	PICC_CMD_REQA = 0x26,
+	PICC_CMD_WUPA = 0x52
 };
 
 enum rfid_cmds {
@@ -36,6 +37,7 @@ enum rfid_cmds {
 	CMD_IDLE = 0,
 	CMD_TRANSCEIVE = 0b1100
 };
+
 enum rfid_regs {
 	REG_CMD = 0x01,
 	REG_COMIEN = 0x02,
@@ -47,12 +49,23 @@ enum rfid_regs {
 	REG_STATUS2 = 0x08,
 	REG_FIFO_DATA = 0x09,
 	REG_FIFO_LEVEL = 0x0A,
+	REG_CTL = 0x0c,
 	REG_MODE = 0x11,
+	REG_TX_MODE = 0x12,
+	REG_RX_MODE = 0x13,
 	REG_TXCTL = 0x14,
+	REG_TX_ASK = 0x15,
 	REG_BIT_FRAMING = 0x0d,
 	REG_COLL = 0x0e,
 	REG_TMODE = 0x2a,
+	REG_TPRESCALER = 0x2b,
+	REG_T_COUNTER_VAL_HI = 0x2e,
+	REG_T_COUNTER_VAL_LO = 0x2f,
+	REG_T_RELOAD_HI = 0x2c,
+	REG_T_RELOAD_LO = 0x2d,
+	REG_VERSION = 0x37
 };
+
 enum rfid_regs_access_modes {
 	REG_WRITE = 0 << 7,
 	REG_READ = 1 << 7
@@ -110,10 +123,17 @@ void rfid_init() {
 	gpio_set_input(RFID_RESET_PIN);
 	if(!gpio_read(RFID_RESET_PIN)) {
 		gpio_set_output(RFID_RESET_PIN);
+		gpio_write(RFID_RESET_PIN, 0);
+		delay_ms(50);
 		gpio_write(RFID_RESET_PIN, 1);
 		delay_ms(50);
-		gpio_write(RFID_RESET_PIN, 0);
 	}
+	// DISABLE RCVOFF
+	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
+	// while(rfid_read_reg(REG_CMD & (1 << 4))) {
+	// 	// wait for exit from soft power down mode
+	// 	printk("waiting for exit of soft power-down mode\n");
+	// }
 }
 
 void rfid_loopback_simple(char*buf) {
@@ -203,8 +223,8 @@ void notmain(void) {
 	printk("initializing oled\n");
 	oled_reset();
 	oled_init();
-    show_text(0,"HELLO");
-    show_text(1,"noah!");
+    show_text(0,"rfid OS");
+    // show_text(1,"pls scan");
 	
 	
 	// rpi_fork(tramp, 0);
@@ -258,27 +278,97 @@ void notmain(void) {
 		rfid_read_reg(REG_CMD) & 0b1111
 	);
 
+	rfid_write_reg(REG_TMODE, 0x80);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
+    rfid_write_reg(REG_TPRESCALER, 0xA9);	// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25�s.
+    rfid_write_reg(REG_T_RELOAD_HI, 0x04);		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
+    rfid_write_reg(REG_T_RELOAD_LO, 0xE8);
+	rfid_write_reg(REG_TX_ASK, 0x40);		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
+	rfid_write_reg(REG_MODE, 0x3D);	
+
+	// output signal on pin TX1 & TX2 delivers the 13.56 MHz energy carrier modulated by the transmission data
+	rfid_write_reg(REG_TXCTL, rfid_read_reg(REG_TXCTL) | 0b11);
 
 	printk("setting up transcieve mode\n");
-	for(int i=0; i<100; i++) {
-		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
-		rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
-		rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
-		// so that the timer starts immediately after transmitting
-		rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~(1<<5));
-		// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~0b);
-		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
-		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
-		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
-		show_text_hex(0, rfid_read_reg(REG_MODE));
-		// like 3 more things
-		// clear IRQ e.g.
-		rfid_write_reg(REG_BIT_FRAMING, (rfid_read_reg(REG_BIT_FRAMING) &  ~0b111) | 7);
-		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
+	// for(int i=0; i<10; i++) {
+	while(1) {
+		printk("\n\n");
+		// rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
+		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_IDLE);
+		// clear all interrupts
+		rfid_write_reg(REG_COM_IRQ, 0b1111111);
+
+		// // not sure what collisions about about
+		// rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
+
+		// // output signal on pin TX2 continuously delivers the unmodulated 13.56 MHz energy carrier
+		// rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
+
+		// // so that the timer starts immediately after transmitting
+		// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~(1<<5));
+
+		// rfid_write_reg(REG_TMODE, )
+
+		// put the wupa command (wake-up) in the FIFO
+		// rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
+		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_REQA);
+
+		// only transmit 7 bits
+		rfid_write_reg(REG_BIT_FRAMING, (rfid_read_reg(REG_BIT_FRAMING) &  ~0b111) | 0b111);
+
+		// rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
+
+		// do not allow incomplete / invalid data receipt
+		rfid_write_reg(REG_RX_MODE, rfid_read_reg(REG_RX_MODE) | (1<<3));
+		
+		// // allow incomplete / invalid data receipt
+		// rfid_write_reg(REG_RX_MODE, rfid_read_reg(REG_RX_MODE) & ~(1<<3));
+
+		// set cmd to transceive
+		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_TRANSCEIVE);
+
+		// begin transmission
 		rfid_write_reg(REG_BIT_FRAMING, rfid_read_reg(REG_BIT_FRAMING) | (1<<7));
+		// do {
+		// 	// not timed out yet
+		// 	printk(
+		// 		"rfid_read_reg(REG_COM_IRQ) = %b\n",
+		// 		rfid_read_reg(REG_COM_IRQ)
+		// 	);
+		// 	printk(
+		// 		"rfid_read_reg(REG_STATUS2) = %b\n",
+		// 		rfid_read_reg(REG_STATUS2)
+		// 	);
+		// } while(!(
+		// 	(rfid_read_reg(REG_COM_IRQ) & 1) // timeout
+		// 	// || (rfid_read_reg(REG_COM_IRQ) & (1 << 5)) // end of received stream
+		// ));
+		delay_ms(100);
+		printk(
+			// TODO verify that RxMultiple is set to 0
+			"rfid_read_reg(REG_RX_MODE) = %b\n",
+			rfid_read_reg(REG_RX_MODE)
+		);
+		printk(
+			// TODO verify that RxLastBits is 0
+			"rfid_read_reg(REG_CTL) = %b\n",
+			rfid_read_reg(REG_CTL)
+		);
+		printk(
+			// TODO verify that Tx1 and tx2 are on
+			"rfid_read_reg(REG_TXCTL) = %b\n",
+			rfid_read_reg(REG_TXCTL)
+		);
 		printk(
 			"rfid_read_reg(REG_COLL) = %b\n",
 			rfid_read_reg(REG_COLL)
+		);
+		printk(
+			"rfid_read_reg(REG_BIT_FRAMING) = %b\n",
+			rfid_read_reg(REG_BIT_FRAMING)
+		);
+		printk(
+			"rfid_read_reg(REG_COM_IRQ) = %b\n",
+			rfid_read_reg(REG_COM_IRQ)
 		);
 		printk(
 			"rfid_read_reg(REG_FIFO_LEVEL) = %b\n",
@@ -308,11 +398,32 @@ void notmain(void) {
 			"rfid_read_reg(REG_MODE) = %b\n",
 			rfid_read_reg(REG_MODE)
 		);
-		show_text_hex(0, rfid_read_reg(REG_STATUS1));
-		show_text_hex(1, rfid_read_reg(REG_STATUS2));
-		show_text_hex(2, rfid_read_reg(REG_CMD));
-		show_text_hex(3, rfid_read_reg(REG_COM_IRQ));
-		delay_ms(100);
+		printk(
+			"rfid_read_reg(REG_VERSION) = %x\n",
+			rfid_read_reg(REG_VERSION)
+		);
+		printk(
+			"rfid_read_reg(REG_T_COUNTER_VAL_LO) = %b\n",
+			rfid_read_reg(REG_T_COUNTER_VAL_LO)
+		);
+		printk(
+			"rfid_read_reg(REG_T_COUNTER_VAL_HI) = %b\n",
+			rfid_read_reg(REG_T_COUNTER_VAL_HI)
+		);
+		printk(
+			"rfid_read_reg(REG_DIV_IRQ) = %b\n",
+			rfid_read_reg(REG_DIV_IRQ)
+		);
+		// show_text_hex(0, rfid_read_reg(REG_STATUS1));
+		// show_text_hex(1, rfid_read_reg(REG_STATUS2));
+		// show_text_hex(2, rfid_read_reg(REG_CMD));
+		// show_text_hex(3, rfid_read_reg(REG_COM_IRQ));
+		if(rfid_read_reg(REG_FIFO_LEVEL)) {
+			printk("o joyous day\n");
+			show_text(2, "card detect");
+			clean_reboot();
+		}
+		delay_ms(500);
 	}
 
 #if 0
