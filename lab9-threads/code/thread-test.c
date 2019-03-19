@@ -114,7 +114,7 @@ static void increase_mem_by_one(void* arg){
 	    //printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 	    //printk("ADDR value %d\n", *int_addr);
 	}
-	//printk("Thread %d finished!\n", rpi_cur_thread()->tid);
+	printk("Thread %d finished!\n", rpi_cur_thread()->tid);
 }
 
 void preemptive_thread_increase(void) {

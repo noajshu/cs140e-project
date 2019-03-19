@@ -2,12 +2,12 @@
 #include "rpi-thread.h"
 #include "timer-interrupt.h"
 
-// typedef rpi_thread_t E;
+//typedef rpi_thread_t E;
 #define E rpi_thread_t
 #include "Q.h"
 
 int* dni_addr = (int*)0x9000000;
-uint32_t** store_next_thread_regs = (uint32_t**)0x09000004;
+uint32_t** cur_thread_reg_array_pointer = (uint32_t**)0x09000004;
 static struct Q runq, freeq;
 static unsigned nthreads;
 
@@ -54,7 +54,6 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	t->cpsr = rpi_get_cpsr();
 
 	Q_append(&runq, t);
-
 	return t;
 }
 
@@ -97,7 +96,11 @@ uint32_t simpler_int_handler(uint32_t cpsr, uint32_t sp, uint32_t lr_caret, uint
         
 		Q_append(&runq, previous_thread);
 		RPI_GetArmTimer()->IRQClear = 1;
-		*store_next_thread_regs = cur_thread->regs;
+		*cur_thread_reg_array_pointer = cur_thread->regs;
+
+		printk("Previous thread #%d has values PC: %x, LR %x, SP %x\n", previous_thread->tid, previous_thread->regs[15], previous_thread->regs[14], previous_thread->regs[13]);
+
+		printk("cur thread #%d has values PC: %x, LR %x, SP %x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14], cur_thread->regs[13]);
 
 		return cur_thread->cpsr;
     }
@@ -108,22 +111,20 @@ uint32_t simpler_int_handler(uint32_t cpsr, uint32_t sp, uint32_t lr_caret, uint
 // 	- <preemptive_p> = 1 implies pre-emptive multi-tasking.
 void rpi_thread_start(int preemptive_p) {
 	scheduler_thread = mk_thread();
-    cur_thread = Q_pop(&runq);
-
-	if(!cur_thread) return;
 
 	if(preemptive_p) {
 		*dni_addr = 0;
 	   install_int_handlers();
 	   timer_interrupt_init(7000); // about 3 seconds
 	   system_enable_interrupts();
-	   *store_next_thread_regs = (uint32_t*)scheduler_thread->regs;
+	   *cur_thread_reg_array_pointer = (uint32_t*)scheduler_thread->regs;
 	}
 
+    cur_thread = scheduler_thread;
 	simpler_interrupt_asm();
 
 	printk("THREAD: done with all threads, returning\n");
-	system_disable_interrupts();
+	if(preemptive_p) system_disable_interrupts();
 }
 
 // pointer to the current thread.  

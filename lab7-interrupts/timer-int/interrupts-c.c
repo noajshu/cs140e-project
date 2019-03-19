@@ -24,9 +24,6 @@ uint32_t interrupt_vector(uint32_t cpsr){
 	// defined by the client.
     uint32_t simpler_int_handler(uint32_t cpsr);
     return simpler_int_handler(cpsr);
-
-	//void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_next_thread_sp, unsigned int* prev_thread_sp);
-  	//int_handler(addr_of_prev_thread_sp, addr_of_next_thread_sp, prev_thread_sp);
 }
 
 #define UNHANDLED(msg,r) \
