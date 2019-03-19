@@ -119,12 +119,12 @@ uint32_t simpler_int_handler(uint32_t cpsr){
 			RPI_GetArmTimer()->IRQClear = 1;
 			return 0;
 		}
-        printk("Value of PC for previous thread %d %x, LR %x\n", previous_thread->tid, previous_thread->regs[15], previous_thread->regs[14]);
+        printk("Value of PC for previous thread #%d PC: %x, LR %x at sp: %x\n", previous_thread->tid, previous_thread->regs[15], previous_thread->regs[14], previous_thread->regs[13]);
 
 		Q_append(&runq, previous_thread);
 		RPI_GetArmTimer()->IRQClear = 1;
-		*store_next_thread_regs = (uint32_t*)cur_thread->regs;
-		printk("Values for new thread %d PC: %x, LR:%x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14]);
+		*store_next_thread_regs = cur_thread->regs;
+		printk("Values for new thread #%d PC: %x, LR:%x at sp: %x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14], cur_thread->regs[13]);
 		printk("Value to be found: %x\n", *store_next_thread_regs);
 		return cur_thread->cpsr;
     }

@@ -4,7 +4,7 @@ typedef struct rpi_thread {
 	uint32_t *sp;
 	uint32_t tid;
 	uint32_t cpsr;
-	uint32_t regs[15];
+	uint32_t regs[16];
 	uint32_t stack[1024 * 8];
 } rpi_thread_t;
 

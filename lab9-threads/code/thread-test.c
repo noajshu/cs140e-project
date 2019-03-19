@@ -105,6 +105,7 @@ static void increase_mem_by_one(void* arg){
 	while(*int_addr < 100000000){
 	    *int_addr += 1;
 		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
+		//reggie1234(arg);
 		//*int_addr = 0;
 	    //enable_dni();
 	    delay_ms(3000);
