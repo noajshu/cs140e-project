@@ -60,7 +60,7 @@ _undefined_instruction_asm:   .word undefined_instruction_asm
 _software_interrupt_asm:      .word software_interrupt_asm
 _prefetch_abort_asm:          .word prefetch_abort_asm
 _data_abort_asm:              .word data_abort_asm
-_interrupt_asm:               .word interrupt_asm
+_interrupt_asm:               .word simpler_interrupt_asm
 _interrupt_table_end:
 
 
@@ -113,6 +113,32 @@ msr cpsr_c, #0x12
 
 pop {r0}
 ldmfa sp!, {pc}^
+
+simpler_interrupt_asm:
+  sub lr, lr, #4
+  
+  @moves sp to the location where address of thread's reg array is
+  mov sp, #0x9000000
+  add sp, sp, #4
+  ldr sp, [sp]
+
+  @store registers into reg array for previous thread
+  stm sp, {r0-r14}^
+  add sp, sp, #60
+  stm sp, {lr}
+
+  mrs r0, spsr
+
+  bl interrupt_vector
+
+  msr spsr, r0
+
+  mov r0, #0x9000000
+  add r0, r0, #4
+  ldr r0, [r0]
+
+  ldm r0, {r0-r15}^
+
 
 
 @ only handler that should run since we only enable general interrupts
@@ -188,6 +214,14 @@ interrupt_asm:
   mrs r3, spsr   //cpsr of prev thread
   str r3, [r1, #52]
 
+  push {r0-r12, lr}
+  mov r3, r1
+  ldr r0, [r3, #52]
+  ldr r2, [r3, #60]
+  ldr r1, [r3, #56]
+  bl check_regs
+  pop {r0-r12, lr}
+
   @restore next reg values
   mov sp, r0
 
@@ -195,9 +229,19 @@ interrupt_asm:
   ldr r0, [sp, #52]
   msr spsr, r0
 
+  mov r4, sp
+  push {r0-r12, lr}
+  ldr r0, [r4, #52]
+  ldr r1, [r4, #56]
+  ldr r2, [r4, #60]
+  mov r3, r4
+  bl check_regs
+  pop {r0-r12, lr}
+
   pop {r0-r12}
   add sp, sp, #4
-  ldmfd sp!, {lr}
+  ldm sp, {lr}^
+  add sp, sp, #4
   ldmfd sp!, {pc}^ @also moves spsr to cpsr
 
 
@@ -212,25 +256,6 @@ do_not_preempt:
   ldr sp, [sp]
 
   movs pc, lr
-
-  @update the spsr
-  @ldr r0, [sp, #60]
-  @msr spsr, r0
-
-  @add r0, sp, #52
-  @stm r0, {lr}^
-
-  @ldr lr, [sp, #56]
-
-  @pop {r0-r12}
-
-  @add sp, sp, #12
-
-
-  @__________________
-
-
-
 
 
 
