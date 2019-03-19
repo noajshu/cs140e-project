@@ -14,7 +14,7 @@
 // verify they make sense (how?)
 unsigned *test_csave(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
 unsigned *test_csave_stmfd(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
-void reggie1234(void *arg);
+volatile void reggie1234(void *arg);
 
 void part0(void) {
 	printk("running part0\n");
@@ -102,7 +102,7 @@ volatile unsigned count = 0;
 static void increase_mem_by_one(void* arg){
 	volatile int* int_addr = (int*)arg;
 	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-	while(*int_addr < 100000000){
+	while(*int_addr < 10){
 	    *int_addr += 1;
 		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 		//reggie1234(arg);
