@@ -7,6 +7,7 @@
 #include "Q.h"
 
 int* dni_addr = (int*)0x9000000;
+uint32_t** store_next_thread_regs = (uint32_t**)0x09000004;
 static struct Q runq, freeq;
 static unsigned nthreads;
 
@@ -35,9 +36,9 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	// stack offsets, change them!
 	enum { 
 		// register offsets are in terms of byte offsets!
-		LR_offset = 60/4,
-		Ret_offset = 56/4,  
-		CPSR_offset = 52/4,
+		PC_offset = 15,
+		LR_offset = 14,  
+		SP_offset = 13,
 		R0_offset = 0, 
 		R1_offset = 4/4, 
 	};
@@ -47,14 +48,22 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 
 	// do the brain-surgery on the new thread stack here.
 	t->sp = &t->stack[sizeof(t->stack)/sizeof(t->stack[0]) -1];
-	t->sp -= 64/4;
-	t->sp[LR_offset] = (uint32_t)rpi_init_trampoline;
-	t->sp[Ret_offset] = (uint32_t)rpi_init_trampoline + 4;
-	t->sp[R1_offset] = (uint32_t)code;
-	t->sp[R0_offset] = (uint32_t)arg;
-	t->sp[CPSR_offset] = rpi_get_cpsr();
+	//t->sp -= 64/4;
+	//t->sp[LR_offset] = (uint32_t)rpi_init_trampoline;
+	//t->sp[Ret_offset] = (uint32_t)rpi_init_trampoline + 4;
+	//t->sp[R1_offset] = (uint32_t)code;
+	//t->sp[R0_offset] = (uint32_t)arg;
+	//t->sp[CPSR_offset] = rpi_get_cpsr();
+    t->regs[PC_offset] = (uint32_t)rpi_init_trampoline;
+	t->regs[LR_offset] = (uint32_t)rpi_init_trampoline + 4;
+	t->regs[SP_offset] = (uint32_t)t->sp;
+	t->regs[R1_offset] = (uint32_t)code;
+	t->regs[R0_offset] = (uint32_t)arg;
+	t->cpsr = rpi_get_cpsr();
+	//t->regs[CPSR_offset] = rpi_get_cpsr();
 
-	printk("rpi_fork with thread %x\n", t->sp);
+
+	printk("rpi_fork with thread regs: %x, sp: %x\n", t->regs, t->sp);
 	Q_append(&runq, t);
 	//printk("runq @ %x\n", &runq);
 	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
@@ -99,6 +108,29 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
+uint32_t simpler_int_handler(uint32_t cpsr){
+	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
+	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
+		rpi_thread_t* previous_thread = cur_thread;
+		previous_thread->cpsr = cpsr;
+        cur_thread = Q_pop(&runq);
+        if(!cur_thread) {
+			cur_thread = previous_thread;
+			RPI_GetArmTimer()->IRQClear = 1;
+			return 0;
+		}
+        printk("Value of PC for previous thread %d %x, LR %x\n", previous_thread->tid, previous_thread->regs[15], previous_thread->regs[14]);
+
+		Q_append(&runq, previous_thread);
+		RPI_GetArmTimer()->IRQClear = 1;
+		*store_next_thread_regs = (uint32_t*)cur_thread->regs;
+		printk("Values for new thread %d PC: %x, LR:%x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14]);
+		printk("Value to be found: %x\n", *store_next_thread_regs);
+		return cur_thread->cpsr;
+    }
+    return 0;
+}
+
 void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_next_thread_sp, unsigned prev_thread_sp) {
     /*Code here should decide whether to preempt or not and to which 
     thread to preempt to*/
@@ -107,13 +139,9 @@ void int_handler(unsigned int* addr_of_prev_thread_sp, unsigned int* addr_of_nex
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
 		printk("Preemption, switching threads!\n");
 		rpi_thread_t* previous_thread = cur_thread;
-		//printk("runq @ %x\n", &runq);
-		//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
 		cur_thread = Q_pop(&runq);
-		//printk("got cur_thread = %x from runq\n", cur_thread);
 
 		if(!cur_thread) {
-			//printk("no thread to switch to, going back\n");
 			cur_thread = previous_thread;
 			RPI_GetArmTimer()->IRQClear = 1;
 			return;
@@ -159,9 +187,9 @@ void rpi_thread_start(int preemptive_p) {
 	//    3. context switch to it, saving current state in
  	//	  <scheduler_thread>
 	scheduler_thread = mk_thread();
-    cur_thread = Q_pop(&runq);
+    //cur_thread = Q_pop(&runq);
 
-	if(!cur_thread) return;
+	//if(!cur_thread) return;
 
 	if(preemptive_p) {
 		*dni_addr = 0;
@@ -169,19 +197,22 @@ void rpi_thread_start(int preemptive_p) {
 	   //timer_interrupt_init(0x4); // 4 cycles
 	   timer_interrupt_init(7000); // about 3 seconds
 	   system_enable_interrupts();
+	   *store_next_thread_regs = (uint32_t*)scheduler_thread->regs;
 	}
 
 	
 	//printk("runq @ %x\n", &runq);
 	//printk("runq.head = %x, runq.tail = %x\n", runq.head, runq.tail);
-	// while (1) {
-	// 	printk("this is the scheduler thread on an infinite loop\n");
-	// 	delay_ms(1000);
-	// }
+	while (1) {
+		printk("this is the scheduler thread on an infinite loop\n");
+		delay_ms(1000);
+	}
 	// don't want to use this since it stores state in
 	// an incompatible 60 byte format on the stack
 	//printk("rpi_thread_start, about to rpi_cswitch\n");
-	rpi_cswitch(&scheduler_thread->sp, &cur_thread->sp);
+	//rpi_cswitch(&scheduler_thread->sp, &cur_thread->sp);
+
+	//simpler_interrupt_handler();
 
 	printk("THREAD: done with all threads, returning\n");
 	system_disable_interrupts();

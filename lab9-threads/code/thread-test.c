@@ -101,12 +101,13 @@ void part2(void) {
 volatile unsigned count = 0;
 static void increase_mem_by_one(void* arg){
 	volatile int* int_addr = (int*)arg;
+	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 	while(*int_addr < 100000000){
 	    *int_addr += 1;
 		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
 		//*int_addr = 0;
 	    //enable_dni();
-	    delay_ms(1000);
+	    delay_ms(3000);
 	    //disable_dni();
 
 	    //printk("Hello from thread %d\n", rpi_cur_thread()->tid);
