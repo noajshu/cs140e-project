@@ -4,7 +4,34 @@
 ## Introduction
 Our project consisted of two parts: setting up an RFID card reader that interfaced with an OLED screen and creating preemptive threads. The purpose of the RFID card reader was to support two-factor authentication that would grant users permissions to run certain programs. The preemptive threads were intended to make the system design simpler. For instance, the OLED display would be controlled by one thread that read from a fixed region of volatile memory, and the various programs (including RFID authentication) would be peer threads. Two factor authentication is a modern approach to system security where multiple factors (e.g., a password and a Yubikey) are combined. Since requiring hardware 2FA for its employees in 2017, Google has detected zero instances of corporate credential theft [1].
 
-## Preemptive Threads
+## How to Run & System Functionality
+
+### RFID & OLED Screen
+To run the RFID & OLED Screen system follow these steps:
+1. Setup the RFID, OLED, and four buttons as described in the hardware setup section.
+2. Go to the project directory: `cd lab8-sonar/sonar-hc-sr04`
+3. Make the binary: `make`
+4. Run the program `my-install sonar.bin`
+5. You should see 'LOGIN PASSWORD:' showing on the screen. The password is '111', so press button 1 three times.
+6. Do two factor authentication by scanning an RFID token on the RFID reader. You should see the Welcome screen.
+7. Press button 0 to enter the programs.
+
+
+Our system presents the user with a login screen requiring a password. The password is in the spectral order, i.e. red, yellow, green, blue. The gray button is a system lockout button that denies access.
+
+Upon presenting valid credentials, a prompt is shown to authenticate with an RFID card. After presenting a card to the reader, the user enters the program environment.
+
+### Preemptive Threads
+NOTE: We did not achieve fully functioning preemptive threads. Despite trying many approaches we were not able to correctly store the link register for a thread that had been preempted. As a result when you first launch a thread it correctly runs its code, however when you switch back to a preempted thread it sometimes does not return to the right place.
+
+To run the preemptive threads run the following commands:
+1. `cd preemptive-threads/lab9-threads/code`
+2. `make`
+
+You should see a test for preemptive threads running that prints out 'Hello, from thread n' for each thread.
+
+## Technical Details
+### Preemptive Threads
  To create preemptive threads we started with the baseline non-preemptive threads that we did in lab 9. We modified the thread struct to have an array called `regs` where the registers are saved when the thread is preempted. This was easier than writing the registers at the end of the thread's stack because we always knew where to write the registers as opposed to having to calculate it each time we were preempted. We kept a global variable called `cur_thread_reg_array_pointer` which held a known memory address, `0x09000004`. At this memory address we stored the address of the register arry for the currently running thread. 
 
  These are the steps that happened each time we were preempted:
@@ -18,16 +45,10 @@ Our project consisted of two parts: setting up an RFID card reader that interfac
  8. Then we load the address of the next thread's register array onto sp.
  9. Finally we load the values from the register array onto r0-r12, sp^, lr^, and pc^. This causes a jump to the next thread's pc.
 
-### DNI Bit
+#### DNI Bit
  We also added support for a do not interrupt bit. This allows a thread to call `enable_dni()` and `disable_dni()` defined in `rpi-thread.c` between a critical section of the code so that the thread cannot be preempted at this time. To implement this, we created a global dni_addr in rpi-thread.c which points to memory address `0x9000000`, and at this address there is either a one or a zero determining if the DNI bit is on or off. When a thread is preempted, we check the DNI bit at address `0x9000000`, and if it is set we jump to the lr - 4 without chaning any of the registers. This way we recover the state that the thread was in when it was preempted. 
 
  Another way to do this could have been to disable interrupts when `enable_dni()` was set. However, we decided not to do it this way because if a thread never disabled the dni bit then the thread could starve all other threads. By keeping interrupts enabled the OS could kill a thread that has been running with the dni bit enabled for a long time.
-
-
-### System Functionality
-Our system presents the user with a login screen requiring a password. The password is in the spectral order, i.e. red, yellow, green, blue. The gray button is a system lockout button that denies access.
-
-Upon presenting valid credentials, a prompt is shown to authenticate with an RFID card. After presenting a card to the reader, the user enters the program environment.
 
 
 ### MFRC522 and RFID technology

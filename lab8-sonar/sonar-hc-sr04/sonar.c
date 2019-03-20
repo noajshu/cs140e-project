@@ -235,82 +235,159 @@ void welcome_screen() {
 
 // const char* USER_NAME = {BUTTON_0, BUTTON_1, BUTTON_2}
 char* num2ASCII = "0123456789";
+char* num2OP = "+-*";
 int ASCII_PLUS = 43;
 int ASCII_SUB = 45;
 int ASCII_EQ = 61;
+int ASCII_PIPE= 124;
+int ASCII_SPACE = 32;
 
 void calculator_program(void* args) {
 	int num1 = -1;
 	int num2 = -1;
-    int op = 0;
-    char first = 0;
-    char second = 0;
-    char operation = 0;
-    char * result = {0, 0};
-    int num_res = 0;
-    char text[6];
-	while(1) {
-        switch (await_button_value())
+    int op = -1;
+    char text[9];
+    int text_idx = 0;
+    int result = 0;
+    char cursor[9];
+
+    for (int i = 0; i < 9; i++) {
+    	text[i] = 0;
+    	cursor[i] = 0;
+    }
+
+    while(1){
+    	switch (await_button_value())
         {
         	case '0':
         		ClearScreen();
 			    rpi_yield();
 			    break;
         	case '1':
-        	    if(num1 == 9){
-        	    	num1 = -1;
-        	    } else if (num2 == 9) {
-        	    	num2 = -1;
-        	    }
-    	    	if(op){
-    	    		num2 += 1;
-    	    		second = num2ASCII[num2];
-	    		} else {
-    	    		num1 += 1;
-    	    		first = num2ASCII[num1];
-	    		}
+                if(text_idx == 0){
+                	num1 += 1;
+                    text[text_idx] = num2ASCII[num1/10];
+                    text[text_idx + 1] = num2ASCII[num1%10];
+                } else if (text_idx == 2) {
+                	op += 1;
+                	if(op == 3) op = 0;
+                	text[text_idx] = num2OP[op];
+                } else if (text_idx == 3){
+                	num2 += 1;
+                    text[text_idx] = num2ASCII[num2/10];
+                    text[text_idx + 1] = num2ASCII[num2%10];
+                } 
     	    	break;
         	case '2':
-        		operation = ASCII_PLUS;
-        		op = 1;
+        		if(text_idx == 3) {
+        	    	text_idx = 2;
+        	    } else if (text_idx == 2) {
+        	    	text_idx = 0;
+        	    }
         		break;
         	case '3':
-        	    operation = ASCII_SUB;
-        	    op = 1;
+        	    if(text_idx == 0) {
+        	    	text_idx = 2;
+        	    } else if (text_idx == 2) {
+        	    	text_idx = 3;
+        	    }
         	    break;
         	case '4':
-        	    if(result[0] == ASCII_EQ){
-        	    	first = -1;
-					second = -1;
-					op = 0;
-					result[0] = 0;
-					result[1] = 0;
-					first = 0;
-					second = 0;
-					operation = 0;
-        	    }
-        	    if(operation == ASCII_PLUS){
-        	    	num_res = num1 + num2;
-        	    } else if(operation == ASCII_SUB) {
-        	    	num_res = num1 - num2;
-        	    }
-        	    result[1] = num2ASCII[num_res];
-        	    result[0] = ASCII_EQ;
-        	    num1 = 0;
-        	    num2 = 0;
-        	    op = 0;
+            	if(op == 0) {
+            		result = num1 + num2;
+            	} else if (op == 1) {
+            		result = num1 - num2;
+            	} else if (op == 2) {
+            		result = num1 * num2;
+            	}
+            	text[5] = ASCII_EQ;
+            	text[6] = num2ASCII[result/10];
+            	text[7] = num2ASCII[result%10];
+    	    	break;
+        	default: 
         	    break;
         }
-        text[0] = first;
-        text[1] = operation;
-        text[2] = second;
-        text[3] = result[0];
-        text[4] = result[1];
-        text[5] = 0;
-		show_text(0, "calculator");
-		show_text(2, text);		
-	}
+        for (int i = 0; i < text_idx; i++) {
+    		cursor[i] = ASCII_SPACE;
+    	}
+        cursor[text_idx] = ASCII_PIPE;
+        for(int j = text_idx + 1; j< 9; j++) {
+        	cursor[j] = 0;
+        }
+        show_text(0, "calculator");
+		show_text(2, text);	
+		show_text(3, cursor);
+    }   	
 }
+
+
+// void calculator_program(void* args) {
+// 	while(1){
+// 		int num1 = -1;
+// 		int num2 = -1;
+// 	    int op = 0;
+// 	    char first = 0;
+// 	    char second = 0;
+// 	    char operation = 0;
+// 	    char * result = {0, 0};
+// 	    int num_res = 0;
+// 	    char text[6];
+// 		while(1) {
+// 			char next_val = await_button_value();
+// 	        switch (next_val)
+// 	        {
+// 	        	case '0':
+// 	        		ClearScreen();
+// 				    rpi_yield();
+// 				    break;
+// 	        	case '1':
+// 	        	    if(num1 == 9){
+// 	        	    	num1 = -1;
+// 	        	    } else if (num2 == 9) {
+// 	        	    	num2 = -1;
+// 	        	    }
+// 	    	    	if(op){
+// 	    	    		num2 += 1;
+// 	    	    		second = num2ASCII[num2];
+// 		    		} else {
+// 	    	    		num1 += 1;
+// 	    	    		first = num2ASCII[num1];
+// 		    		}
+// 	    	    	break;
+// 	        	case '2':
+// 	        		operation = ASCII_PLUS;
+// 	        		op = 1;
+// 	        		break;
+// 	        	case '3':
+// 	        	    operation = ASCII_SUB;
+// 	        	    op = 1;
+// 	        	    break;
+// 	        	case '4':
+// 	        	    if(operation == ASCII_PLUS){
+// 	        	    	num_res = num1 + num2;
+// 	        	    } else if(operation == ASCII_SUB) {
+// 	        	    	num_res = num1 - num2;
+// 	        	    }
+// 	        	    result[1] = num2ASCII[num_res];
+// 	        	    result[0] = ASCII_EQ;
+// 	        	    num1 = 0;
+// 	        	    num2 = 0;
+// 	        	    op = 0;
+// 	        	    break;
+// 	        	default: 
+// 	        	    break;
+// 	        }
+// 	        text[0] = first;
+// 	        text[1] = operation;
+// 	        text[2] = second;
+// 	        text[3] = result[0];
+// 	        text[4] = result[1];
+// 	        text[5] = 0;
+// 			show_text(0, "calculator");
+// 			show_text(2, text);		
+// 		}
+// 	}
+// }
 
 
 void strncpy(char* dst, char* src, size_t len) {
@@ -397,12 +474,12 @@ void notmain(void) {
 	rfid_config();
 	// for(int i=0; i<10; i++) {
 
-	// while(!password_authenticate()) {}
-	// show_text(4, "rfid 2FA");
-	// while (!detect_rfid_card()) {}
+	while(!password_authenticate()) {}
+	show_text(4, "rfid 2FA");
+	while (!detect_rfid_card()) {}
 
 	ClearScreen();
-	// welcome_screen();
+	welcome_screen();
 	rpi_fork(calculator_program, (void*)0);
 	rpi_fork(ereader_program, (void*)0);
 	rpi_fork(info_program, (void*)0);
