@@ -107,8 +107,6 @@ uint32_t simpler_int_handler(uint32_t cpsr, uint32_t sp, uint32_t lr_caret, uint
     return 0;
 }
 
-// starts the thread system: nothing runs before.
-// 	- <preemptive_p> = 1 implies pre-emptive multi-tasking.
 void rpi_thread_start(int preemptive_p) {
 	scheduler_thread = mk_thread();
 
@@ -121,7 +119,7 @@ void rpi_thread_start(int preemptive_p) {
 	}
 
     cur_thread = scheduler_thread;
-	simpler_interrupt_asm();
+	switch_to_first_thread();
 
 	printk("THREAD: done with all threads, returning\n");
 	if(preemptive_p) system_disable_interrupts();
