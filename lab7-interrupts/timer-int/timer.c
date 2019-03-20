@@ -23,12 +23,12 @@ void int_handler(unsigned pc) {
 	if((pending & RPI_BASIC_ARM_TIMER_IRQ) == 0)
 		return;
 
-        /* 
+    /* 
 	 * Clear the ARM Timer interrupt - it's the only interrupt we have
          * enabled, so we want don't have to work out which interrupt source
          * caused us to interrupt 
 	 *
-	 * Q: if we delete? It will go back into it. Looks like Pi Hangs.
+	 * Q: if we delete?
 	 */
         RPI_GetArmTimer()->IRQClear = 1;
 	cnt++;

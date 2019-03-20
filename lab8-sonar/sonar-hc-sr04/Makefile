@@ -4,17 +4,17 @@
 NAME=sonar
 
 TH=../../lab9-threads/code
-TI=  ../../lab7-interrupts/timer-int
+# TI=  ../../lab7-interrupts/timer-int
 OLED=  ../../spi02
 OBJS = $(NAME).o $(LIBPI_PATH)/cs140e-start.o \
 	$(TH)/rpi-thread.o \
 	$(TH)/thread-asm.o \
 	$(OLED)/spi02.o	\
-	$(TI)/interrupts-asm.o \
-	$(TI)/interrupts-c.o	\
-	$(TI)/cstart.o		\
-	$(TI)/timer-interrupt.o
-	# $(TI)/start.o		\
+	# $(TI)/interrupts-asm.o \
+	# $(TI)/interrupts-c.o	\
+	# $(TI)/cstart.o		\
+	# $(TI)/timer-interrupt.o
+	# # $(TI)/start.o		\
 
 
 ifndef LIBPI_PATH
@@ -33,7 +33,7 @@ include $(LIBPI_PATH)/includes.mk
 # 	$(TI)/cstart.o		\
 # 	$(TI)/start.o		\
 # 	$(TI)/timer-interrupt.o
-CFLAGS += -I$(TH) -I$(TI) -I$(OLED)
+CFLAGS += -I$(TH) -I$(OLED) #  -I$(TI)
 all: libpi $(NAME).bin
 
 # is there a better way to do this?

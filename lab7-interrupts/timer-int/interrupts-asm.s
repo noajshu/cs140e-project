@@ -21,7 +21,6 @@
  *  T : = 0 indicates ARM execution, = 1 is thumb execution.
  *      Mode = current mode.
  */
- @ set 7th bit in CPSR to 0 to enable IRQ
 .globl system_enable_interrupts
 system_enable_interrupts:
     mrs r0,cpsr                 @ move process status register (PSR) to r0
@@ -60,91 +59,44 @@ _undefined_instruction_asm:   .word undefined_instruction_asm
 _software_interrupt_asm:      .word software_interrupt_asm
 _prefetch_abort_asm:          .word prefetch_abort_asm
 _data_abort_asm:              .word data_abort_asm
-_interrupt_asm:               .word simpler_interrupt_asm
+_interrupt_asm:               .word interrupt_asm
 _interrupt_table_end:
 
-.globl switch_to_first_thread
-switch_to_first_thread:
-  ldm r0, {r0-r15}
+@ only handler that should run since we only enable general interrupts
+interrupt_asm:
+  @ mov sp, #0x8000 @ what dwelch uses: bad if int handler uses deep stack
+  mov sp, #0x9000000  @ i believe we have 512mb - 16mb, so this should be safe
+  sub   lr, lr, #4
 
-.globl simpler_interrupt_asm
-simpler_interrupt_asm:
-  sub lr, lr, #4
-  
-  @ Check the DNI bit written to this address
-  mov sp, #0x9000000
-  ldr sp, [sp]
+  push  {r0-r12,lr}         @ XXX: pushing too many registers: only need caller
+  @ vpush {s0-s15}	    @ uncomment if want to save caller-saved fp regs
 
-  @ if DNI bit is set, branch to do_not_preempt function
-  cmp sp, #1
-  beq do_not_preempt
+  mov   r0, lr              @ Pass old pc
+  bl    interrupt_vector    @ C function
 
-  @ moves sp to the location where address of thread's reg array is
-  mov sp, #0x9000000
-  add sp, sp, #4
-  @ load the address of the reg array to sp
-  ldr sp, [sp]
+  @ vpop {s0-s15}           @ pop caller saved fp regs
+  pop   {r0-r12,lr} 	    @ pop integer registers
 
-  @ store the register in the reg array
-  stmia sp!, {r0-r14}^
-  add sp, sp, #60
-  @ store the pc to return to at the 15th index of the reg array
-  stm sp, {lr}
-  
-
-  @ move sp here so that interrupt_vector can add things to the stack that grows down from this address
-  mov sp, #0x9000000
-  @ pass the cpsr of the previous thread to the function to save in the thread struct
-  mrs r0, spsr
-
-  push {r0-r12, lr}
-  bl interrupt_vector
-  pop {r0-r12, lr}
-
-  @ this is the cpsr of the next thread, so set the spsr
-  msr spsr, r0
-
-  @ the interrupt_vector has put the address of the new reg array into this address.
-  mov sp, #0x9000000
-  add sp, sp, #4
-  @ load the address of the new reg array
-  ldr sp, [sp]
-
-  @ load the values of the registers from the reg array
-  ldmia sp, {r0-r15}^
-
-
-@ if we don't want to preempt, just turn off interrupts so we don't jump back to the 
-@ interrupt handler. Then jump to the lr leaving all the registers as they were before 
-@ the preemption.
-do_not_preempt:
-  push {r0-r12, lr}
-  bl clear_arm_timer_interrupt
-  pop {r0-r12, lr}
-
-  movs pc, lr
-
+  @ return from interrupt handler: will re-enable general ints.
+  movs    pc, lr        @ moves the link register into the pc and implicitly
+                        @ loads the PC with the result, then copies the 
+                        @ SPSR to the CPSR.
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @ we don't generate any of these, will just panic and halt.
 @
 reset_asm:
   sub   lr, lr, #4
-  mov   r0, lr
   bl    reset_vector
 undefined_instruction_asm:
   sub   lr, lr, #4
-  mov   r0, lr
   bl    undefined_instruction_vector
 software_interrupt_asm:
   sub   lr, lr, #4
-  mov   r0, lr
   bl    software_interrupt_vector
 prefetch_abort_asm:
   sub   lr, lr, #4
-  mov   r0, lr
   bl    prefetch_abort_vector
 data_abort_asm:
   sub   lr, lr, #4
-  mov   r0, lr
   bl    data_abort_vector

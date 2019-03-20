@@ -1,13 +1,10 @@
 #include "rpi.h"
 #include "rpi-thread.h"
-#include "timer-interrupt.h"
 
-//typedef rpi_thread_t E;
+// typedef rpi_thread_t E;
 #define E rpi_thread_t
 #include "Q.h"
 
-int* dni_addr = (int*)0x9000000;
-uint32_t** cur_thread_reg_array_pointer = (uint32_t**)0x09000004;
 static struct Q runq, freeq;
 static unsigned nthreads;
 
@@ -21,6 +18,7 @@ static rpi_thread_t *mk_thread(void) {
 	if(!(t = Q_pop(&freeq)))
  		t = kmalloc(sizeof(rpi_thread_t));
 
+	t->sp = &(t->stack[1024 * 8 - 1]);
 	t->tid = nthreads;
 	nthreads++;
 
@@ -31,94 +29,116 @@ static rpi_thread_t *mk_thread(void) {
 rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	rpi_thread_t *t = mk_thread();
 
+	// you can use these for setting the values in the first thread.
+	// if your context switching code stores these values at different
+	// stack offsets, change them!
 	enum { 
 		// register offsets are in terms of byte offsets!
-		PC_offset = 15,
-		LR_offset = 14,  
-		SP_offset = 13,
-		R0_offset = 0, 
-		R1_offset = 1, 
+		LR_offset = 52/4,
+		CPSR_offset = 56/4,
+		R0_offset = 0/4, 
+		R1_offset = 4/4,
 	};
 
 	// write this so that it calls code,arg.
 	void rpi_init_trampoline(void);
 
 	// do the brain-surgery on the new thread stack here.
-	t->sp = &t->stack[sizeof(t->stack)/sizeof(t->stack[0]) -1];
+	// LR_offset
+	// t->sp = &(t->stack[1024 * 8 - 1]);
 
-    t->regs[PC_offset] = (uint32_t)rpi_init_trampoline;
-	t->regs[LR_offset] = (uint32_t)rpi_init_trampoline + 4;
-	t->regs[SP_offset] = (uint32_t)t->sp;
-	t->regs[R1_offset] = (uint32_t)code;
-	t->regs[R0_offset] = (uint32_t)arg;
-	t->cpsr = rpi_get_cpsr();
+	t->sp -= 60 / 4;
+	t->sp[LR_offset] = (unsigned)rpi_init_trampoline;
+	(t->sp)[R0_offset] = (unsigned)arg;
+	(t->sp)[R1_offset] = (unsigned)code;
+	(t->sp)[CPSR_offset] = (unsigned)rpi_get_cpsr();
 
 	Q_append(&runq, t);
+	runq.n++;
+
+	printk("%d\n", Q_size(&runq));
 	return t;
 }
 
 // exit current thread.
 void rpi_exit(int exitcode) {
-	Q_append(&freeq, cur_thread);
-	rpi_thread_t* previous_thread = cur_thread;
-	if(!(cur_thread = Q_pop(&runq))){
-		cur_thread = scheduler_thread;
+	/*
+	 * 1. free current thread.
+	 *
+	 * 2. if there are more threads, dequeue one and context
+ 	 * switch to it.
+	 
+	 * 3. otherwise we are done, switch to the scheduler thread 
+	 * so we call back into the client code.
+	 */
+	 
+	 rpi_thread_t* dequeued_thread = Q_pop(&runq);
+	 if (dequeued_thread == 0) {
+ 		printk("THREAD: done with all threads, switching to scheduler thread\n");
+		rpi_cswitch(&cur_thread->sp, &scheduler_thread->sp);
+		cur_thread = scheduler_thread; // will never execute
+	} else {
+		printk("THREAD: rpi_exit switching to a new thread\n");
+		rpi_thread_t* cur_thread = mk_thread();
+		runq.n--;
+		Q_append(&freeq, cur_thread);
+		unsigned * cur = &cur_thread->sp;
+		cur_thread = dequeued_thread;
+		rpi_cswitch(cur, &dequeued_thread->sp);
+		// how to free a single struct (old cur_thread)?
 	}
-	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
 // yield the current thread.
 void rpi_yield(void) {
-	rpi_thread_t* previous_thread = cur_thread;
-	cur_thread = Q_pop(&runq);
+	// if cannot dequeue a thread from runq
+	//	- there are no more runnable threads, return.  
+	// otherwise: 
+	//	1. enqueue current thread to runq.
+	// 	2. context switch to the new thread.
+	// unimplemented();
+	rpi_thread_t* dequeued_thread = Q_pop(&runq);
+	if (dequeued_thread == 0) {
+		printk("THREAD: done with all threads, returning from rpi_yield\n");
+		// clean_reboot();
+	} else {
+		// printk("THREAD: rpi_yield switching to a new thread\n");
+		runq.n--;
+		Q_append(&runq, cur_thread);
+		runq.n++;
 
-	if(!cur_thread) {
-		cur_thread = previous_thread;
-		return;
+		unsigned * cur = &cur_thread->sp;
+		cur_thread = dequeued_thread;
+		rpi_cswitch(cur, &dequeued_thread->sp);
+		// rpi_cswitch(&cur_thread->sp, &dequeued_thread->sp);
 	}
-	
-	Q_append(&runq, previous_thread);
-	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
-}
-
-uint32_t simpler_int_handler(){
-	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
-	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
-		rpi_thread_t* previous_thread = cur_thread;
-		previous_thread->cpsr = cpsr;
-
-        cur_thread = Q_pop(&runq);
-        if(!cur_thread) {
-			cur_thread = previous_thread;
-			RPI_GetArmTimer()->IRQClear = 1;
-			return;
-			return cur_thread->cpsr;
-		}
-        
-		if(previous_thread->tid != scheduler_thread->tid) Q_append(&runq, previous_thread);
-		RPI_GetArmTimer()->IRQClear = 1;
-		*cur_thread_reg_array_pointer = cur_thread->regs;
-
-		return cur_thread->cpsr;
-    }
-    return 0;
 }
 
 void rpi_thread_start(int preemptive_p) {
-	scheduler_thread = mk_thread();
+	assert(!preemptive_p);
 
-	if(preemptive_p) {
-		*dni_addr = 0;
-	   install_int_handlers();
-	   timer_interrupt_init(7000); // about 3 seconds
-	   system_enable_interrupts();
-	   *cur_thread_reg_array_pointer = (uint32_t*)scheduler_thread->regs;
+	// if runq is empty, return.
+	// otherswise:
+	//    1. create a new fake thread 
+	//    2. dequeue a thread from the runq
+	//    3. context switch to it, saving current state in
+ 	//	  <scheduler_thread>
+	rpi_thread_t* dequeued_thread = Q_pop(&runq);
+	
+	if (dequeued_thread == 0) {
+		printk("THREAD: done with all threads, returning from rpi_thread_start\n");
+		clean_reboot();
+	} else {
+		printk("THREAD: rpi_thread_start starting thread\n");
+		scheduler_thread = mk_thread();
+		printk("scheduler_thread = %x\n", scheduler_thread);
+		// rpi_thread_t* dequeued_thread = Q_pop(&runq);
+		runq.n--;
+		cur_thread = dequeued_thread;
+		// printk("%d\n", Q_size(&runq));
+		printk("cur_thread->sp = %x, scheduler_thread->sp = %x\n", cur_thread->sp, scheduler_thread->sp);
+		rpi_cswitch(&scheduler_thread->sp, &cur_thread->sp);
 	}
-    cur_thread = Q_pop(&runq);
-    switch_to_first_thread(cur_thread->regs);
-
-	printk("THREAD: done with all threads, returning\n");
-	if(preemptive_p) system_disable_interrupts();
 }
 
 // pointer to the current thread.  
@@ -127,21 +147,9 @@ rpi_thread_t *rpi_cur_thread(void) {
 	return cur_thread;
 }
 
-void enable_dni(){
-   *dni_addr = 1;
-}
-
-void disable_dni(){
-	*dni_addr = 0;
-}
-
-void clear_arm_timer_interrupt(){
-	RPI_GetArmTimer()->IRQClear = 1;
-}
-
 // call this an other routines from assembler to print out different
 // registers!
-void check_regs(unsigned r0, unsigned r1, unsigned r2, unsigned r3) {
-	printk("r0=%x, r1=%x r2=%x r3=%x\n", r0, r1, r2, r3);
-	return;
+void check_regs(unsigned r0, unsigned r1, unsigned sp, unsigned lr) {
+	printk("r0=%x, r1=%x lr=%x sp=%x\n", r0, r1, lr, sp);
+	clean_reboot();
 }

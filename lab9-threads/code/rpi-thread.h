@@ -3,8 +3,6 @@ typedef struct rpi_thread {
 	struct rpi_thread *next;
 	uint32_t *sp;
 	uint32_t tid;
-	uint32_t cpsr;
-	uint32_t regs[16];
 	uint32_t stack[1024 * 8];
 } rpi_thread_t;
 
@@ -24,9 +22,6 @@ void rpi_thread_start(int preemptive_p);
 // pointer to the current thread.  
 //	- note: if pre-emptive is enabled this can change underneath you!
 rpi_thread_t *rpi_cur_thread(void);
-
-void enable_dni(void);
-void disable_dni(void);
 
 // context-switch:
 //      - after saving state, write value of sp to <sp_old>

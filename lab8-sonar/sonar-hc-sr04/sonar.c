@@ -19,6 +19,10 @@
 #include "MFRC522.h"
 
 
+const unsigned BUTTON_HI_PIN = 4;
+const unsigned OLED_RST_PIN = 6;
+
+
 const int trigger_pin = 12;
 const int echo_pin = 16;
 const int led_pin = 21;
@@ -27,183 +31,7 @@ int distance_in_cm(int t1) {
 	return t1/58;
 }
 
-enum picc_cmds {
-	PICC_CMD_REQA = 0x26,
-	PICC_CMD_WUPA = 0x52
-};
-
-enum rfid_cmds {
-	CMD_GEN_RANDOM_ID = 0b0010,
-	CMD_IDLE = 0,
-	CMD_TRANSCEIVE = 0b1100
-};
-
-enum rfid_regs {
-	REG_CMD = 0x01,
-	REG_COMIEN = 0x02,
-	REG_DIVIEN = 0x03,
-	REG_COM_IRQ = 0x04,
-	REG_DIV_IRQ = 0x05,
-	REG_ERROR = 0x06,
-	REG_STATUS1 = 0x07,
-	REG_STATUS2 = 0x08,
-	REG_FIFO_DATA = 0x09,
-	REG_FIFO_LEVEL = 0x0A,
-	REG_CTL = 0x0c,
-	REG_MODE = 0x11,
-	REG_TX_MODE = 0x12,
-	REG_RX_MODE = 0x13,
-	REG_TXCTL = 0x14,
-	REG_TX_ASK = 0x15,
-	REG_BIT_FRAMING = 0x0d,
-	REG_COLL = 0x0e,
-	REG_TMODE = 0x2a,
-	REG_TPRESCALER = 0x2b,
-	REG_T_COUNTER_VAL_HI = 0x2e,
-	REG_T_COUNTER_VAL_LO = 0x2f,
-	REG_T_RELOAD_HI = 0x2c,
-	REG_T_RELOAD_LO = 0x2d,
-	REG_VERSION = 0x37
-};
-
-enum rfid_regs_access_modes {
-	REG_WRITE = 0 << 7,
-	REG_READ = 1 << 7
-};
-
-// k = expected number of send bytes
-// n = expected number of received bytes
-void rfid_transaction(char* inbuf, char* outbuf, unsigned k, unsigned n) {
-	chip_select(1);
-	transfer_active(1);
-	// CLEAR RX FIFO (this will discard any data inside)
-	while(((1 << 17) & spi0->CS)) {
-		char junk = spi0->FIFO;
-	}
-	while(!((1<<18) & spi0->CS)) {} // TXD full
-	unsigned i = 0, j = 0;
-	// printk("about to go in ij loop with k=%d, n=%d\n", k, n);
-	while ((i < k) || (j < n)) {
-		// printk("i=%d, j=%d\n", i, j);
-		while((i < k) && ((1 << 18) & spi0->CS)) {
-			// TXD can accept data
-			spi0->FIFO = inbuf[i] &0xFF;
-			i++;
-		}
-		while((j < n) && ((1 << 17) & spi0->CS)) {
-			// RXD has data
-			outbuf[j] = spi0->FIFO;
-			j++;
-		}
-	}
-	while (!((1 << 16) & spi0->CS)) {} // DONE
-	spi0->CS = 0x0;
-	return;
-}
-
-void rfid_write_reg(char reg, char val) {
-	char msg[2];
-	msg[0] = REG_WRITE | (reg << 1);
-	msg[1] = val;
-	return rfid_transaction(msg, (void*)0, 2, 0);
-}
-
-char rfid_read_reg(char reg) {
-	char msg[2];
-	msg[0] = REG_READ | (reg << 1);
-	msg[1] = 0;
-	char out[2];
-	rfid_transaction(msg, out, 2, 2);
-	return out[1];
-}
-
-#define RFID_RESET_PIN 5
-void rfid_init() {
-	// check if we need are in "power down" mode
-	gpio_set_input(RFID_RESET_PIN);
-	if(!gpio_read(RFID_RESET_PIN)) {
-		gpio_set_output(RFID_RESET_PIN);
-		gpio_write(RFID_RESET_PIN, 0);
-		delay_ms(50);
-		gpio_write(RFID_RESET_PIN, 1);
-		delay_ms(50);
-	}
-	// DISABLE RCVOFF
-	rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
-	// while(rfid_read_reg(REG_CMD & (1 << 4))) {
-	// 	// wait for exit from soft power down mode
-	// 	printk("waiting for exit of soft power-down mode\n");
-	// }
-}
-
-void rfid_loopback_simple(char*buf) {
-	char* message = "  hello simple from mifare device!!";
-	message[0] = REG_WRITE | (REG_FIFO_DATA << 1);
-	// put message in fifo
-	printk("putting message in fifo\n");
-	rfid_transaction(message, (void*)0, strlen(message), 0);
-	// retrive message from fifo
-	char readcmd[100];
-	for(unsigned i=0; i<100; i++)
-		readcmd[i] = REG_READ | (REG_FIFO_DATA << 1);
-	rfid_transaction(readcmd, buf, strlen(message), strlen(message));
-	buf[strlen(message)] = 0;
-	return;
-}
-
-void rfid_loopback_regs(char*buf) {
-	char* message = "hello simple from mifare device!!";
-	// message[0] = REG_WRITE | (REG_FIFO_DATA << 1);
-	// // put message in fifo
-	// printk("putting message in fifo\n");
-	// rfid_transaction(message, (void*)0, strlen(message), 0);
-	// // retrive message from fifo
-	// char readcmd[100];
-	// for(unsigned i=0; i<100; i++)
-	// 	readcmd[i] = REG_READ | (REG_FIFO_DATA << 1);
-	// rfid_transaction(readcmd, buf, strlen(message), strlen(message));
-	unsigned i=0;
-	while (i<strlen(message)) {
-		rfid_write_reg(REG_FIFO_DATA, message[i]);
-		i++;
-		// printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
-	}
-	buf[i]=0;
-	// printk("rfid_read_reg(REG_FIFO_LEVEL) = %b\n", rfid_read_reg(REG_FIFO_LEVEL));
-	i=0;
-	unsigned level = rfid_read_reg(REG_FIFO_LEVEL) & 0b01111111;
-	while(i < level) {
-		// printk("reading from FIFO\n");
-		buf[i] = rfid_read_reg(REG_FIFO_DATA);
-		i++;
-	}
-	buf[i]=0;
-	return;
-}
-
-
-void tramp(void* args) {
-	while(1){}
-}
-
-void detect_rfid_card(void* args) {
-	while(1) {
-		// do register manipulation of MIFARE
-		// to check for a card
-		// maybe do critical section protection (DNI)
-		printk("I am checking the RFID card rigt now.\n");
-		delay_ms(1000);
-	}
-}
-
-void update_display(void* args) {
-	while(1) {
-		printk("I am updating the OLED display with information.\n");
-		delay_ms(1000);
-	}
-}
 void oled_reset(void) {
-	#define OLED_RST_PIN 6
 	gpio_set_output(OLED_RST_PIN);
 	gpio_write(OLED_RST_PIN, 1);
 	delay_ms(50);
@@ -213,218 +41,376 @@ void oled_reset(void) {
 	delay_ms(50);
 }
 
-void notmain(void) {
-    uart_init();
+enum BUTTONS {
+	// these define the GPIO pins used
+	BUTTON_0 = 23,
+	BUTTON_1 = 18,
+	BUTTON_2 = 22,
+	BUTTON_3 = 27,
+	BUTTON_4 = 17,
+	NO_BUTTON
+};
 
-	printk("enabling spi0\n");
+enum {
+	ASCII_0 = 48,
+	ASCII_1 = 49,
+	ASCII_2 = 50,
+	ASCII_3 = 51,
+	ASCII_4 = 52,
+	ASCII_5 = 53,
+	ASCII_6 = 54,
+	ASCII_7 = 55,
+	ASCII_8 = 56,
+	ASCII_9 = 57
+};
+
+
+void button_init() {
+	gpio_set_input(BUTTON_0);
+	gpio_set_input(BUTTON_1);
+	gpio_set_input(BUTTON_2);
+	gpio_set_input(BUTTON_3);
+	gpio_set_input(BUTTON_4);
+
+	gpio_set_output(BUTTON_HI_PIN);
+	gpio_write(BUTTON_HI_PIN, 1);
+	// from now on, do gpio_read(button)
+	// to detect a button press
+}
+
+
+const unsigned sticky_key_wait_ms = 100;
+char await_button_value() {
+	while(1) {
+		if (gpio_read(BUTTON_0)) {
+			while(gpio_read(BUTTON_0)){}
+			delay_ms(sticky_key_wait_ms);
+			return ASCII_0;
+		}
+		if (gpio_read(BUTTON_1)) {
+			while(gpio_read(BUTTON_1)){}
+			delay_ms(sticky_key_wait_ms);
+			return ASCII_1;
+		}
+		if (gpio_read(BUTTON_2)) {
+			while(gpio_read(BUTTON_2)){}
+			delay_ms(sticky_key_wait_ms);
+			return ASCII_2;
+		}
+		if (gpio_read(BUTTON_3)) {
+			while(gpio_read(BUTTON_3)){}
+			delay_ms(sticky_key_wait_ms);
+			return ASCII_3;
+		}
+		if (gpio_read(BUTTON_4)) {
+			while(gpio_read(BUTTON_4)){}
+			delay_ms(sticky_key_wait_ms);
+			return ASCII_4;
+		}
+	}
+}
+
+char is_any_button_pressed() {
+	return (gpio_read(BUTTON_0) || gpio_read(BUTTON_1) || gpio_read(BUTTON_2) || gpio_read(BUTTON_3) || gpio_read(BUTTON_4));
+}
+
+char get_button_stickiness(int sticky_ms) {
+	if (gpio_read(BUTTON_0)) {
+		delay_ms(sticky_ms);
+		return BUTTON_0;
+	}
+	if (gpio_read(BUTTON_1)) {
+		delay_ms(sticky_ms);
+		return BUTTON_1;
+	}
+	if (gpio_read(BUTTON_2)) {
+		delay_ms(sticky_ms);
+		return BUTTON_2;
+	}
+	if (gpio_read(BUTTON_3)) {
+		delay_ms(sticky_ms);
+		return BUTTON_3;
+	}
+	if (gpio_read(BUTTON_4)) {
+		delay_ms(sticky_ms);
+		return BUTTON_4;
+	}
+}
+char get_button() {
+	if (gpio_read(BUTTON_0)) {
+		while(gpio_read(BUTTON_0)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_0;
+	}
+	if (gpio_read(BUTTON_1)) {
+		while(gpio_read(BUTTON_1)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_1;
+	}
+	if (gpio_read(BUTTON_2)) {
+		while(gpio_read(BUTTON_2)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_2;
+	}
+	if (gpio_read(BUTTON_3)) {
+		while(gpio_read(BUTTON_3)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_3;
+	}
+	if (gpio_read(BUTTON_4)) {
+		while(gpio_read(BUTTON_4)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_4;
+	}
+	return NO_BUTTON;
+}
+
+
+void display_current_buttons_pressed() {
+	char * button_msg = kmalloc(16*8);
+	if(gpio_read(BUTTON_0) || gpio_read(BUTTON_1) || gpio_read(BUTTON_2) || gpio_read(BUTTON_3) || gpio_read(BUTTON_4)) {
+		strcpy(button_msg, "buttons         ");
+		if (gpio_read(BUTTON_0)) {
+			button_msg[8] = ASCII_0;
+		}
+		if (gpio_read(BUTTON_1)) {
+			button_msg[9] = ASCII_1;
+		}
+		if (gpio_read(BUTTON_2)) {
+			button_msg[10] = ASCII_2;
+		}
+		if (gpio_read(BUTTON_3)) {
+			button_msg[11] = ASCII_3;
+		}
+		if (gpio_read(BUTTON_4)) {
+			button_msg[12] = ASCII_4;
+		}
+		show_text(3, button_msg);
+	} else {
+		show_text(3, "                ");
+	}
+}
+
+
+char * PASSWORD = "111";
+char PWDLEN = 3;
+char password_attempt[4];
+int password_authenticate() {
+	int i = 0;
+	char correct = 1;
+	while(i < PWDLEN) {
+		password_attempt[i] = await_button_value();
+		show_text(1, password_attempt);
+		correct = correct && (PASSWORD[i] == password_attempt[i]);
+		i++;
+	}
+	if(correct) {
+		show_text(2, "ACCESS GRANTED");
+		return 1;
+	} else {
+		show_text(2, "ACCESS DENIED");
+		return 0;
+	}
+}
+
+
+void welcome_screen() {
+	show_text(0, "WELCOME");
+	// char* smileys = {1, 2, 1, 2, 1, 2};
+	char* smileys = "- - - - - - - - ";
+	for(int i=0; i<10; i++) {
+		for(int j=0; j<16; j++) {
+			if((j+i)%2) {
+				smileys[j] = j % 2 ? 1 : 2;
+			} else {
+				smileys[j] = 32;
+			}
+		}
+		show_text(1, smileys);
+		show_text(2, smileys + 1);
+		show_text(3, smileys + 2);
+		delay_ms(500);
+	}
+}
+
+// const char* USER_NAME = {BUTTON_0, BUTTON_1, BUTTON_2}
+char* num2ASCII = "0123456789";
+int ASCII_PLUS = 43;
+int ASCII_SUB = 45;
+int ASCII_EQ = 61;
+
+void calculator_program(void* args) {
+	int num1 = -1;
+	int num2 = -1;
+    int op = 0;
+    char first = 0;
+    char second = 0;
+    char operation = 0;
+    char * result = {0, 0};
+    int num_res = 0;
+    char text[6];
+	while(1) {
+        switch (await_button_value())
+        {
+        	case '0':
+        		ClearScreen();
+			    rpi_yield();
+			    break;
+        	case '1':
+        	    if(num1 == 9){
+        	    	num1 = -1;
+        	    } else if (num2 == 9) {
+        	    	num2 = -1;
+        	    }
+    	    	if(op){
+    	    		num2 += 1;
+    	    		second = num2ASCII[num2];
+	    		} else {
+    	    		num1 += 1;
+    	    		first = num2ASCII[num1];
+	    		}
+    	    	break;
+        	case '2':
+        		operation = ASCII_PLUS;
+        		op = 1;
+        		break;
+        	case '3':
+        	    operation = ASCII_SUB;
+        	    op = 1;
+        	    break;
+        	case '4':
+        	    if(result[0] == ASCII_EQ){
+        	    	first = -1;
+					second = -1;
+					op = 0;
+					result[0] = 0;
+					result[1] = 0;
+					first = 0;
+					second = 0;
+					operation = 0;
+        	    }
+        	    if(operation == ASCII_PLUS){
+        	    	num_res = num1 + num2;
+        	    } else if(operation == ASCII_SUB) {
+        	    	num_res = num1 - num2;
+        	    }
+        	    result[1] = num2ASCII[num_res];
+        	    result[0] = ASCII_EQ;
+        	    num1 = 0;
+        	    num2 = 0;
+        	    op = 0;
+        	    break;
+        }
+        text[0] = first;
+        text[1] = operation;
+        text[2] = second;
+        text[3] = result[0];
+        text[4] = result[1];
+        text[5] = 0;
+		show_text(0, "calculator");
+		show_text(2, text);		
+	}
+}
+
+
+void strncpy(char* dst, char* src, size_t len) {
+	for(unsigned i=0; i<len; i++) {
+		dst[i] = src[i];
+	}
+	dst[len] = 0;
+}
+
+int SCREEN_CHAR_WIDTH = 16;
+void ereader_program(void* args) {
+
+	unsigned cursor_pos = 0;
+	char* text = "He finishes his cereal and is about to disconnect when an anonynous message slices onto the screen. SCREEN Do you want to know what the Matrix is, Neo? Neo is frozen when he reads his name. SCREEN SUPERASTIC: Who said that? JACKON: Who's Neo? GIBSON: This is a private board. If you want to know, follow the white rabbit. NEO What the hell... SCREEN TIMAXE: Someone is hacking the hackers! FOS4: It's Morpheus!!!!! JACKON: Identify yourself. Knock, knock, Neo. A chill runs down his spine and when someone KNOCKS on his door he almost jumps out of his chair. He looks at the door, then back at the computer but the message is gone. He shakes his head, not completely sure what happened. Again, someone knocks. Cautiously, Neo approaches the door. VOICE (O.S.) Hey, Tommy-boy! You in there? Recognizing the voice, he relaxes and opens it. ANTHONY, who lives down the hall, is standing outside with a group of friends. NEO What do you want, Anthony? ANTHONY I need your help, man. Desperate. They got me, man. The shackles of fascism. He holds up the red notice that accompanies the Denver boot. NEO You got the money this time? He holds up two hundred dollars and Neo opens the door. Anthony's girlfriend, DUJOUR, stops in front of Neo. DUJOUR You can really get that thing off, right now? ANTHONY I told you, honey, he may look like just another geek but this here is all we got left standing between Big Brother and the New World Order. EXT. STREET A police officer unlocks a yellow metal boot from the wheel of an enormous oldsmobile. INT. NEO'S APARTMENT They watch from the window as the cops, silently, robotically, climb into their van. ANTHONY Look at 'em. Automatons. Don't think about what they're- doing or why. Computer tells 'em what to do and they do it. FRIEND #l Thc banality of evil. He slaps the money in Neo's hand. ANTHONY Thanks, neighbor. DUJOUR Why don't you come to the party with us? NEO I don't know. I have to work tomorrow. DUJOUR Come on. It'll be fun. He looks up at her and suddenly notices on her black leather motorcycle jacket dozens of pins: bands, symbols, slogans, military medals and -- A small white rabbit. The ROOM TILTS. NEO Yeah, yeah. Sure, I'll go. INT. APARTMENT An older Chicago apartment; a series of halls connects a chain of small high-ceilinged rooms lined with heavy casements. Smoke hangs like a veil, blurring the few lights there are. Dressed predominantly in black, people are everywhere, gathered in cliques around pieces of furniture like jungle cats around a tree. Neo stands against a wall, alone, sipping from a bottle of beer, feeling completely out of place, he is about to leave when he notices a woman staring at him. The woman is Trinity. She walks straight up to him. In the nearest room, shadow-like figures grind against each other to the pneumatic beat of INDUSTRIAL MUSIC. TRINITY Hello, Neo. NEO How did you know that -- TRINITY I know a lot about you. I've been wanting to meet you for some time. NEO Who are you? TRINITY My name is Trinity. NEO Trinity? The Trinity? The Trinity that cracked the I.R.S. Kansas City D-Base? TRINITY That was a long time ago. NEO Gee-zus. TRINITY What? NEO I just thought... you were a guy. TRINITY Most guys do. Neo is a little embarrassed. NEO Do you want to go sorewhere and talk? TRINITY No. It's safe here and I don't have much time. The MUSIC is so loud they must stand very close, talking directly into each other's ear. NEO That was you on the board tonight. That was your note, wasn't it? TRINITY I had to gamble that you would see and they wouldn't. NEO Who wouldn't? TRINITY I can't explain everything to you. I'm sure that it's all going to seem very strange, but I brought you here to warn you, Neo. You are in a lot of danger. NEO What? Why? TRINITY They're watching you. Something happened and they found out about you. Normally, if our target is exposed we let it go. But this time, we can't do that. NEO I don't understand -- TRINITY You came here because you wanted to know the answer to a hacker's question. NEO The Matrix. What is the Matrix? TRINITY Twelve years ago I met a man, a great man, who said that no one could be told the answer to that question. That they had to see it, to believe it. Her body is against his; her lips very close to his ear. TRINITY He told me that no one should look for the answer unless they have to because once you see it, everything changes. Your life and the world you live in will never be the same. It's as if you wake up one morning and the sky is falling. There is a hypnotic quality to her voice and Neo feels the words like a drug, seeping into him. TRINITY The truth is out there, Neo. It's looking for you and it will find you, if you want it to. She takes hold of him with her eyes. TRINITY That's all I can tell you right now. Good-bye, Neo. And good luck.";
+	char * line_buf = kmalloc(SCREEN_CHAR_WIDTH*8);
+
+	while(1) {
+		if(gpio_read(BUTTON_0)) {
+			while(gpio_read(BUTTON_0)){}
+			ClearScreen();
+			rpi_yield();
+		} else if (gpio_read(BUTTON_4)) {
+			clean_reboot();
+		}
+		if(is_any_button_pressed()) {
+			switch (get_button_stickiness(100)) {
+				case BUTTON_3:
+					// scroll down
+					cursor_pos++;
+					break;
+				case BUTTON_2:
+					// scroll up
+					cursor_pos--;
+					break;
+				default:
+					break;
+			}
+		}
+		show_text(0, "EREADER");
+		for(unsigned i=0; i<5; i++) {
+			strncpy(line_buf, &text[(i+cursor_pos)*SCREEN_CHAR_WIDTH], SCREEN_CHAR_WIDTH);
+			show_text(i+1, line_buf);
+		}
+	}
+}
+
+void info_program(void* args) {
+	while(1) {
+		if(gpio_read(BUTTON_0)) {
+			while(gpio_read(BUTTON_0)){}
+			ClearScreen();
+			rpi_yield();
+		} else if (gpio_read(BUTTON_4)) {
+			clean_reboot();
+		}
+		char* info_msg = "This computer was designed and built by Nadin and Noah in Dawson Engler's CS140e course.";
+		show_text(0, "Information");
+		// for(i=0; i)
+		// show_text(1, info_msg);
+		// show_text(2, "designed and built by");
+		// show_text(4, "");
+	}
+}
+
+
+void notmain(void) {
+
+    uart_init();
+	printk("initializing buttons\n");
+	button_init();
+	printk("initializing spi0\n");
 	spi_init();
 	printk("initializing rfid\n");
 	rfid_init();
-	printk("initializing oled\n");
+	printk("resetting oled\n");
 	oled_reset();
+	printk("initializing oled\n");
 	oled_init();
-    show_text(0,"rfid OS");
-    // show_text(1,"pls scan");
+    show_text(0,"LOGIN PASSWORD:");
 	
-	
-	// rpi_fork(tramp, 0);
-	// rpi_fork(detect_rfid_card, 0);
-	// rpi_fork(update_display, 0);
-	// rpi_thread_start(1);
-	// 
-	
-	// // printk("putting soft reset cmd to spi0\n");
-	// // spi_putc((unsigned long)0b1111);
-	// // printk("putting gen rand ID cmd to spi0\n");
-	// // spi_putc((unsigned long)0b0010);
-	// // printk("putting transmit cmd to spi0\n");
-	// // spi_putc((unsigned long)0b0100);
-	// // spi_putc((unsigned long)((0x01 << 1) || 0b1));
-	// // printk("getting char from spi0\n");
-	// // printk("got '%c'\n", spi_getc());
-	// 
-	// delay_ms(100);
-	// spi0->CS = 0xB0;
-	// // gpio_write(8, 0);
-	// // should be version
-	// for(unsigned i=1; i<55; i++) {
-	// 	while (!((1 << 18) & spi0->CS)) {} // TXD
-	// 	spi0->FIFO = ((1 << 7 | (i << 1)) &0xFF);
-	// }
-	// printk("waiting for DONE\n");
-	// while (!((1 << 16) & spi0->CS)) {} // DONE
-	// // printk("waiting for RXD\n");
-	// while (!((1 << 17) & spi0->CS)) {} // RXD
-	// while (((1 << 17) & spi0->CS)) {
-	// 	printk("spi0->FIFO = %x\n", spi0->FIFO);
-	// }
-	// spi0->CS = 0x0;
-	// delay_ms(300);
-	// 
-	// char fifo_data[100];
-	// rfid_loopback(fifo_data);
-	// printk("rfid_loopback = %s\n", fifo_data);
-	
-	char buf1[100];
-	rfid_loopback_simple(buf1);
-	printk("rfid_loopback_simple = %s\n", buf1);
-	char buf2[100];
-	rfid_loopback_regs(buf2);
-	printk("rfid_loopback_regs = %s\n", buf2);
 	// clean_reboot();
+	test_mfrc522();
 
-	printk(
-		"rfid_read_reg(REG_CMD) & 0b1111 = %b\n",
-		rfid_read_reg(REG_CMD) & 0b1111
-	);
-
-	rfid_write_reg(REG_TMODE, 0x80);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
-    rfid_write_reg(REG_TPRESCALER, 0xA9);	// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25�s.
-    rfid_write_reg(REG_T_RELOAD_HI, 0x04);		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
-    rfid_write_reg(REG_T_RELOAD_LO, 0xE8);
-	rfid_write_reg(REG_TX_ASK, 0x40);		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
-	rfid_write_reg(REG_MODE, 0x3D);	
-
-	// output signal on pin TX1 & TX2 delivers the 13.56 MHz energy carrier modulated by the transmission data
-	rfid_write_reg(REG_TXCTL, rfid_read_reg(REG_TXCTL) | 0b11);
-
-	printk("setting up transcieve mode\n");
+	rfid_config();
 	// for(int i=0; i<10; i++) {
-	while(1) {
-		printk("\n\n");
-		// rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_IDLE);
-		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_IDLE);
-		// clear all interrupts
-		rfid_write_reg(REG_COM_IRQ, 0b1111111);
 
-		// // not sure what collisions about about
-		// rfid_write_reg(REG_COLL, rfid_read_reg(REG_COLL) & ~0x80);
+	// while(!password_authenticate()) {}
+	// show_text(4, "rfid 2FA");
+	// while (!detect_rfid_card()) {}
 
-		// // output signal on pin TX2 continuously delivers the unmodulated 13.56 MHz energy carrier
-		// rfid_write_reg(REG_TXCTL, (rfid_read_reg(REG_TXCTL) & ~0b111) | 0b100);
+	ClearScreen();
+	// welcome_screen();
+	rpi_fork(calculator_program, (void*)0);
+	rpi_fork(ereader_program, (void*)0);
+	rpi_fork(info_program, (void*)0);
+	rpi_thread_start(0);
 
-		// // so that the timer starts immediately after transmitting
-		// rfid_write_reg(REG_MODE, rfid_read_reg(REG_MODE) & ~(1<<5));
 
-		// rfid_write_reg(REG_TMODE, )
+	clean_reboot();
 
-		// put the wupa command (wake-up) in the FIFO
-		// rfid_write_reg(REG_FIFO_DATA, PICC_CMD_WUPA);
-		rfid_write_reg(REG_FIFO_DATA, PICC_CMD_REQA);
-
-		// only transmit 7 bits
-		rfid_write_reg(REG_BIT_FRAMING, (rfid_read_reg(REG_BIT_FRAMING) &  ~0b111) | 0b111);
-
-		// rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b101111) | CMD_TRANSCEIVE);
-
-		// do not allow incomplete / invalid data receipt
-		rfid_write_reg(REG_RX_MODE, rfid_read_reg(REG_RX_MODE) | (1<<3));
-		
-		// // allow incomplete / invalid data receipt
-		// rfid_write_reg(REG_RX_MODE, rfid_read_reg(REG_RX_MODE) & ~(1<<3));
-
-		// set cmd to transceive
-		rfid_write_reg(REG_CMD, (rfid_read_reg(REG_CMD) & ~0b1111) | CMD_TRANSCEIVE);
-
-		// begin transmission
-		rfid_write_reg(REG_BIT_FRAMING, rfid_read_reg(REG_BIT_FRAMING) | (1<<7));
-		// do {
-		// 	// not timed out yet
-		// 	printk(
-		// 		"rfid_read_reg(REG_COM_IRQ) = %b\n",
-		// 		rfid_read_reg(REG_COM_IRQ)
-		// 	);
-		// 	printk(
-		// 		"rfid_read_reg(REG_STATUS2) = %b\n",
-		// 		rfid_read_reg(REG_STATUS2)
-		// 	);
-		// } while(!(
-		// 	(rfid_read_reg(REG_COM_IRQ) & 1) // timeout
-		// 	// || (rfid_read_reg(REG_COM_IRQ) & (1 << 5)) // end of received stream
-		// ));
-		delay_ms(100);
-		printk(
-			// TODO verify that RxMultiple is set to 0
-			"rfid_read_reg(REG_RX_MODE) = %b\n",
-			rfid_read_reg(REG_RX_MODE)
-		);
-		printk(
-			// TODO verify that RxLastBits is 0
-			"rfid_read_reg(REG_CTL) = %b\n",
-			rfid_read_reg(REG_CTL)
-		);
-		printk(
-			// TODO verify that Tx1 and tx2 are on
-			"rfid_read_reg(REG_TXCTL) = %b\n",
-			rfid_read_reg(REG_TXCTL)
-		);
-		printk(
-			"rfid_read_reg(REG_COLL) = %b\n",
-			rfid_read_reg(REG_COLL)
-		);
-		printk(
-			"rfid_read_reg(REG_BIT_FRAMING) = %b\n",
-			rfid_read_reg(REG_BIT_FRAMING)
-		);
-		printk(
-			"rfid_read_reg(REG_COM_IRQ) = %b\n",
-			rfid_read_reg(REG_COM_IRQ)
-		);
-		printk(
-			"rfid_read_reg(REG_FIFO_LEVEL) = %b\n",
-			rfid_read_reg(REG_FIFO_LEVEL)
-		);
-		printk(
-			"rfid_read_reg(REG_STATUS1) = %b\n",
-			rfid_read_reg(REG_STATUS1)
-		);
-		printk(
-			"rfid_read_reg(REG_STATUS2) = %b\n",
-			rfid_read_reg(REG_STATUS2)
-		);
-		printk(
-			"rfid_read_reg(REG_CMD) = %b\n",
-			rfid_read_reg(REG_CMD)
-		);
-		printk(
-			"rfid_read_reg(REG_ERROR) = %b\n",
-			rfid_read_reg(REG_ERROR)
-		);
-		printk(
-			"rfid_read_reg(REG_TMODE) = %b\n",
-			rfid_read_reg(REG_TMODE)
-		);
-		printk(
-			"rfid_read_reg(REG_MODE) = %b\n",
-			rfid_read_reg(REG_MODE)
-		);
-		printk(
-			"rfid_read_reg(REG_VERSION) = %x\n",
-			rfid_read_reg(REG_VERSION)
-		);
-		printk(
-			"rfid_read_reg(REG_T_COUNTER_VAL_LO) = %b\n",
-			rfid_read_reg(REG_T_COUNTER_VAL_LO)
-		);
-		printk(
-			"rfid_read_reg(REG_T_COUNTER_VAL_HI) = %b\n",
-			rfid_read_reg(REG_T_COUNTER_VAL_HI)
-		);
-		printk(
-			"rfid_read_reg(REG_DIV_IRQ) = %b\n",
-			rfid_read_reg(REG_DIV_IRQ)
-		);
-		// show_text_hex(0, rfid_read_reg(REG_STATUS1));
-		// show_text_hex(1, rfid_read_reg(REG_STATUS2));
-		// show_text_hex(2, rfid_read_reg(REG_CMD));
-		// show_text_hex(3, rfid_read_reg(REG_COM_IRQ));
-		if(rfid_read_reg(REG_FIFO_LEVEL)) {
-			printk("o joyous day\n");
-			show_text(2, "card detect");
-			clean_reboot();
-		}
-		delay_ms(500);
-	}
 
 #if 0
 	printk("starting sonar!\n");
@@ -471,9 +457,6 @@ void notmain(void) {
 		i++;
 	}
 
-
-
-	//
 	//
 	// 	4. use the code in gpioextra.h and then replace it with your
 	//	own (using the broadcom pdf in the docs/ directory).
