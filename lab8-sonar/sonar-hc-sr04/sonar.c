@@ -248,14 +248,8 @@ void calculator_program(void* args) {
     char operation = 0;
     char * result = {0, 0};
     int num_res = 0;
+    char text[6];
 	while(1) {
-		if(result[0] != 0){
-			first = -1;
-			second = -1;
-			operation = 0;
-			result[0] = 0;
-			result[1] = 0;
-		}
         switch (await_button_value())
         {
         	case '0':
@@ -263,15 +257,18 @@ void calculator_program(void* args) {
 			    rpi_yield();
 			    break;
         	case '1':
-        	    if(num1 != 9 || num2 != 9){
-        	    	if(op){
-	    	    		num2 += 1;
-	    	    		second = num2ASCII[num2];
-    	    		} else {
-	    	    		num1 += 1;
-	    	    		first = num2ASCII[num1];
-    	    		}
+        	    if(num1 == 9){
+        	    	num1 = -1;
+        	    } else if (num2 == 9) {
+        	    	num2 = -1;
         	    }
+    	    	if(op){
+    	    		num2 += 1;
+    	    		second = num2ASCII[num2];
+	    		} else {
+    	    		num1 += 1;
+    	    		first = num2ASCII[num1];
+	    		}
     	    	break;
         	case '2':
         		operation = ASCII_PLUS;
@@ -282,6 +279,16 @@ void calculator_program(void* args) {
         	    op = 1;
         	    break;
         	case '4':
+        	    if(result[0] == ASCII_EQ){
+        	    	first = -1;
+					second = -1;
+					op = 0;
+					result[0] = 0;
+					result[1] = 0;
+					first = 0;
+					second = 0;
+					operation = 0;
+        	    }
         	    if(operation == ASCII_PLUS){
         	    	num_res = num1 + num2;
         	    } else if(operation == ASCII_SUB) {
@@ -294,7 +301,6 @@ void calculator_program(void* args) {
         	    op = 0;
         	    break;
         }
-        char text[6];
         text[0] = first;
         text[1] = operation;
         text[2] = second;
