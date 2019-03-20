@@ -81,20 +81,21 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
-uint32_t simpler_int_handler(uint32_t cpsr, uint32_t sp, uint32_t lr_caret, uint32_t future_pc){
+void simpler_int_handler(){
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
 		rpi_thread_t* previous_thread = cur_thread;
-		previous_thread->cpsr = cpsr;
+		//previous_thread->cpsr = cpsr;
 
         cur_thread = Q_pop(&runq);
         if(!cur_thread) {
 			cur_thread = previous_thread;
 			RPI_GetArmTimer()->IRQClear = 1;
-			return 0;
+			return;
+			//return cur_thread->cpsr;
 		}
         
-		Q_append(&runq, previous_thread);
+		if(previous_thread->tid != scheduler_thread->tid) Q_append(&runq, previous_thread);
 		RPI_GetArmTimer()->IRQClear = 1;
 		*cur_thread_reg_array_pointer = cur_thread->regs;
 
@@ -102,9 +103,9 @@ uint32_t simpler_int_handler(uint32_t cpsr, uint32_t sp, uint32_t lr_caret, uint
 
 		printk("cur thread #%d has values PC: %x, LR %x, SP %x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14], cur_thread->regs[13]);
 
-		return cur_thread->cpsr;
+		//return cur_thread->cpsr;
     }
-    return 0;
+    //return 0;
 }
 
 // starts the thread system: nothing runs before.

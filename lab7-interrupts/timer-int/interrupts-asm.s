@@ -83,22 +83,25 @@ simpler_interrupt_asm:
   ldr sp, [sp]
 
   @ store the register in the reg array
-  stmia sp, {r0-r14}^
-  add sp, sp, #60
+  stmia sp!, {r0-r12}
+  stm sp, {sp}^
+  add sp, sp, #4
+  stm sp, {lr}^
+  add sp, sp, #4
+  @add sp, sp, #60
   @ store the pc to return to at the 15th index of the reg array
-  stm sp, {lr}
+  stm sp!, {lr}
   
-  mov sp, #0x9000000
-  @ move sp here so that interrupt_vector can add things to the stack that grows down from this address
-  @ pass the cpsr of the previous thread to the function to save in the thread struct
-  mrs r0, spsr
 
-  push {r0-r12, lr}
+  @ move sp here so that interrupt_vector can add things to the stack that grows down from this address
+  mov sp, #0x9000000
+  @ pass the cpsr of the previous thread to the function to save in the thread struct
+  //mrs r0, spsr
+
   bl interrupt_vector
-  pop {r0-r12, lr}
 
   @ this is the cpsr of the next thread, so set the spsr
-  msr spsr, r0
+  //msr spsr, r0
 
   @ the interrupt_vector has put the address of the new reg array into this address.
   mov sp, #0x9000000
@@ -106,8 +109,19 @@ simpler_interrupt_asm:
   @ load the address of the new reg array
   ldr sp, [sp]
 
+  sub sp, sp, #4
+  ldr r0, [sp]
+  msr spsr, r0
+  add sp, sp, #4
+
   @ load the values of the registers from the reg array
-  ldmia sp, {r0-r15}^
+  ldmia sp!, {r0-r12}
+  ldm sp, {r13}^
+  add sp, sp, #4
+  ldm sp, {r14}^
+  add sp, sp, #4
+  @add sp, sp, #60
+  ldm sp, {r15}^
 
 
 @ if we don't want to preempt, just turn off interrupts so we don't jump back to the 
