@@ -63,6 +63,10 @@ _data_abort_asm:              .word data_abort_asm
 _interrupt_asm:               .word simpler_interrupt_asm
 _interrupt_table_end:
 
+.globl switch_to_first_thread
+switch_to_first_thread:
+  ldm r0, {r0-r15}
+
 
 .globl simpler_interrupt_asm
 simpler_interrupt_asm:

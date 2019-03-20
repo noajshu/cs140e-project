@@ -54,6 +54,7 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	t->cpsr = rpi_get_cpsr();
 
 	Q_append(&runq, t);
+	printk("Thread reg %x\n", t->regs);
 	return t;
 }
 
@@ -120,9 +121,8 @@ void rpi_thread_start(int preemptive_p) {
 	   system_enable_interrupts();
 	   *cur_thread_reg_array_pointer = (uint32_t*)scheduler_thread->regs;
 	}
-
-    cur_thread = scheduler_thread;
-	simpler_interrupt_asm();
+    cur_thread = Q_pop(&runq);
+    switch_to_first_thread(cur_thread->regs);
 
 	printk("THREAD: done with all threads, returning\n");
 	if(preemptive_p) system_disable_interrupts();
