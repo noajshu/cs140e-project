@@ -55,7 +55,12 @@ enum {
 	ASCII_1 = 49,
 	ASCII_2 = 50,
 	ASCII_3 = 51,
-	ASCII_4 = 52
+	ASCII_4 = 52,
+	ASCII_5 = 53,
+	ASCII_6 = 54,
+	ASCII_7 = 55,
+	ASCII_8 = 56,
+	ASCII_9 = 57
 };
 
 
@@ -171,16 +176,75 @@ void welcome_screen() {
 }
 
 // const char* USER_NAME = {BUTTON_0, BUTTON_1, BUTTON_2}
-
+char* num2ASCII = "0123456789";
+int ASCII_PLUS = 43;
+int ASCII_SUB = 45;
+int ASCII_EQ = 61;
 
 void calculator_program(void* args) {
+	int num1 = -1;
+	int num2 = -1;
+    int op = 0;
+    char first = 0;
+    char second = 0;
+    char operation = 0;
+    char * result = {0, 0};
+    int num_res = 0;
 	while(1) {
-		if(gpio_read(BUTTON_0)) {
-			while(gpio_read(BUTTON_0)){}
-			ClearScreen();
-			rpi_yield();
+		if(result[0] != 0){
+			first = -1;
+			second = -1;
+			operation = 0;
+			result[0] = 0;
+			result[1] = 0;
 		}
+        switch (await_button_value())
+        {
+        	case '0':
+        		ClearScreen();
+			    rpi_yield();
+			    break;
+        	case '1':
+        	    if(num1 != 9 || num2 != 9){
+        	    	if(op){
+	    	    		num2 += 1;
+	    	    		second = num2ASCII[num2];
+    	    		} else {
+	    	    		num1 += 1;
+	    	    		first = num2ASCII[num1];
+    	    		}
+        	    }
+    	    	break;
+        	case '2':
+        		operation = ASCII_PLUS;
+        		op = 1;
+        		break;
+        	case '3':
+        	    operation = ASCII_SUB;
+        	    op = 1;
+        	    break;
+        	case '4':
+        	    if(operation == ASCII_PLUS){
+        	    	num_res = num1 + num2;
+        	    } else if(operation == ASCII_SUB) {
+        	    	num_res = num1 - num2;
+        	    }
+        	    result[1] = num2ASCII[num_res];
+        	    result[0] = ASCII_EQ;
+        	    num1 = 0;
+        	    num2 = 0;
+        	    op = 0;
+        	    break;
+        }
+        char text[6];
+        text[0] = first;
+        text[1] = operation;
+        text[2] = second;
+        text[3] = result[0];
+        text[4] = result[1];
+        text[5] = 0;
 		show_text(0, "calculator");
+		show_text(2, text);		
 	}
 }
 
