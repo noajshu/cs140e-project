@@ -14,20 +14,26 @@
 // verify they make sense (how?)
 unsigned *test_csave(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
 unsigned *test_csave_stmfd(uint32_t *u, unsigned a1, unsigned a2, unsigned a3);
-volatile void reggie1234(void *arg);
+
 
 void part0(void) {
 	printk("running part0\n");
 	unsigned cpsr = rpi_get_cpsr();
 	printk("cpsr() = %x\n", cpsr);
+
 	// check that interrupts are disabled and that we are in kernel mode.
-	printk("Interrupts are disabled? %d\n", cpsr >> 7 & 1);
-	assert(cpsr >> 7 & 1);
-	printk("Mode is: %x\n", cpsr & 0xff);
-	assert((cpsr & 0xff) == 0xd3);
+	// BCM2835 manual, section 7.5
+	// assert();
+
+	// interrupts
+	assert((cpsr & 0b10000000) == 0b10000000);
+	assert((cpsr >> 7) & 1);
+	// // kernel mode (supervisor)
+	// assert((cpsr & 0b11111) == 0b10011);
+	// printk("in supervisor mode, interrupts disabled\n");
 
 	// stack grows down.
-	uint32_t u[128+1], *e = &u[127], n, *p;
+	unsigned u[128+1], *e = &u[127], n, *p;
 	u[127] = 0;
 	u[128] = 0;
 	printk("end of save=%p\n", &u[127]);
@@ -40,18 +46,25 @@ void part0(void) {
 
 	assert(!u[128]);
 
-	p = test_csave_stmfd(e, 1,2,3);
-	n = e - p;
-	printk("save area = %x, saved [%d] registers, %d bytes\n", e, n, 4*n);
-	for(int i = 0; i < n; i++)
-		printk("\tr[%d] = %x\n", i, p[i]);
-	assert(!u[128]);
+	// p = test_csave_stmfd(e, 1,2,3);
+	// n = e - p;
+	// printk("save area = %x, saved [%d] registers, %d bytes\n", e, n, 4*n);
+	// for(int i = 0; i < n; i++)
+	// 	printk("\tr[%d] = %x\n", i, p[i]);
+	// assert(!u[128]);
 }
 
 // called from assembly.
 void notreached(void) { 
-	panic("not reachined was reached!\n"); 
+	panic("not reached was reached!\n"); 
 }
+
+
+// void hellofunc(long long foo, long long bar, long long baz, long long boz, long long bof, long long fob) {
+// 	printk("%i", foo);
+// 	return;
+// }
+
 
 void part1(void) {
 	rpi_thread_t t;
@@ -61,7 +74,7 @@ void part1(void) {
 	// check that we can context switch to ourselves multiple
 	// times.
 	for(int i = 0; i < 100; i++) {
-		printk("%d: about to cswitch, addr of sp=%x\n", i, &t.sp);
+		printk("%d: about to cswitch, addr of sp=%x\n", &t.sp);
 		unsigned r = rpi_cswitch(&t.sp, &t.sp);
 		printk("%d: returned=%x, sp=%x\n", i, r, t.sp);
 		printk("\tgetcpsr=%x\n", rpi_get_cpsr());
@@ -71,6 +84,7 @@ void part1(void) {
 // trivial test.   you should write a few that are better, please!
 volatile int thread_count, thread_sum;
 static void thread_code(void *arg) {
+	// printk("hello from a thread_code\n");
 	printk("in thread %p, with %x\n", rpi_cur_thread()->tid, arg);
 	thread_count ++;
 	thread_sum += (unsigned)arg;
@@ -87,9 +101,9 @@ static void thread_code(void *arg) {
 // check that we can fork/yield/exit and start the threads package.
 void part2(void) {
 	printk("running part2\n");
-	int n = 30;
+	int n = 20;
 	thread_sum = thread_count = 0;
-	for(int i = 0; i < n; i++) 
+	for(int i = 0; i < n; i++)
 		rpi_fork(thread_code, (void*)i);
 	rpi_thread_start(0);
 
@@ -98,44 +112,14 @@ void part2(void) {
 	assert(thread_count == n);
 }
 
-volatile unsigned count = 0;
-static void increase_mem_by_one(void* arg){
-	volatile int* int_addr = (int*)arg;
-	printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-	while(*int_addr < 10){
-	    *int_addr += 1;
-		printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-		//reggie1234(arg);
-		//*int_addr = 0;
-	    //enable_dni();
-	    delay_ms(3000);
-	    //disable_dni();
-
-	    //printk("Hello from thread %d\n", rpi_cur_thread()->tid);
-	    //printk("ADDR value %d\n", *int_addr);
-	}
-	printk("Thread %d finished!\n", rpi_cur_thread()->tid);
-}
-
-void preemptive_thread_increase(void) {
-    printk("Running write to one memory address of code %x\n", increase_mem_by_one);
-    int n = 4;
-    int* addr = (void*)0x100000;
-    *addr = 0;
-    for(int i= 0; i<n; i++) {
-    	rpi_fork(increase_mem_by_one, (void*)addr);
-		//rpi_fork(reggie1234, (void*)addr);
-    }
-    rpi_thread_start(1);
-    printk("Addr value is %d\n", *addr);
-}
-
 void notmain() {
         uart_init();
-        preemptive_thread_increase();
-        //part0();
-        //part1();
+
+// #if 0
+	// part0();
+	// part1();
 	// for(int i = 0; i < 20; i++)
-		// part2();
+	part2();
+// #endif
 	clean_reboot();
 }

@@ -4,3 +4,5 @@ void hex_screen ( unsigned int x );
 void ClearScreen ( void );
 void oled_init(void);
 void spi_init(void);
+void SetPageStart ( unsigned int x );
+void SetColumn ( unsigned int x );

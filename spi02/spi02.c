@@ -217,10 +217,14 @@ void SetPageStart ( unsigned int x )
 //------------------------------------------------------------------------
 void SetColumn ( unsigned int x )
 {
-    x+=0x20;
+    // we don't want this center alignment
+    // x+=0x20;
     spi_command(0x10|((x>>4)&0x0F));
     spi_command(0x00|((x>>0)&0x0F));
 }
+// int notmain() {
+//     return 0;
+// }
 //------------------------------------------------------------------------
 void show_text(unsigned int col, char *s)
 {
@@ -387,7 +391,3 @@ void oled_init() {
 // // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // //
 // //-------------------------------------------------------------------------
-
-// int notmain() {
-//     return 0;
-// }
