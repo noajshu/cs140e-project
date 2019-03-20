@@ -31,11 +31,15 @@ Upon presenting valid credentials, a prompt is shown to authenticate with an RFI
 
 
 ### MFRC522 and RFID technology
+The contactless card reader/writer that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code, a Miller code, has the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 
 
 
 
 ### References
 [1] True2F: Backdoor-resistant authentication tokens
+[2] https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf
+[3] https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
 
 
-
+[5] https://www.imsdb.com/scripts/Matrix,-The.html
+[6] http://infocenter.arm.com

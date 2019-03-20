@@ -47,7 +47,8 @@ enum BUTTONS {
 	BUTTON_1 = 18,
 	BUTTON_2 = 22,
 	BUTTON_3 = 27,
-	BUTTON_4 = 17
+	BUTTON_4 = 17,
+	NO_BUTTON
 };
 
 enum {
@@ -109,6 +110,62 @@ char await_button_value() {
 	}
 }
 
+char is_any_button_pressed() {
+	return (gpio_read(BUTTON_0) || gpio_read(BUTTON_1) || gpio_read(BUTTON_2) || gpio_read(BUTTON_3) || gpio_read(BUTTON_4));
+}
+
+char get_button_stickiness(int sticky_ms) {
+	if (gpio_read(BUTTON_0)) {
+		delay_ms(sticky_ms);
+		return BUTTON_0;
+	}
+	if (gpio_read(BUTTON_1)) {
+		delay_ms(sticky_ms);
+		return BUTTON_1;
+	}
+	if (gpio_read(BUTTON_2)) {
+		delay_ms(sticky_ms);
+		return BUTTON_2;
+	}
+	if (gpio_read(BUTTON_3)) {
+		delay_ms(sticky_ms);
+		return BUTTON_3;
+	}
+	if (gpio_read(BUTTON_4)) {
+		delay_ms(sticky_ms);
+		return BUTTON_4;
+	}
+}
+char get_button() {
+	if (gpio_read(BUTTON_0)) {
+		while(gpio_read(BUTTON_0)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_0;
+	}
+	if (gpio_read(BUTTON_1)) {
+		while(gpio_read(BUTTON_1)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_1;
+	}
+	if (gpio_read(BUTTON_2)) {
+		while(gpio_read(BUTTON_2)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_2;
+	}
+	if (gpio_read(BUTTON_3)) {
+		while(gpio_read(BUTTON_3)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_3;
+	}
+	if (gpio_read(BUTTON_4)) {
+		while(gpio_read(BUTTON_4)){}
+		delay_ms(sticky_key_wait_ms);
+		return BUTTON_4;
+	}
+	return NO_BUTTON;
+}
+
+
 void display_current_buttons_pressed() {
 	char * button_msg = kmalloc(16*8);
 	if(gpio_read(BUTTON_0) || gpio_read(BUTTON_1) || gpio_read(BUTTON_2) || gpio_read(BUTTON_3) || gpio_read(BUTTON_4)) {
@@ -145,13 +202,14 @@ int password_authenticate() {
 		password_attempt[i] = await_button_value();
 		show_text(1, password_attempt);
 		correct = correct && (PASSWORD[i] == password_attempt[i]);
-		
 		i++;
 	}
 	if(correct) {
 		show_text(2, "ACCESS GRANTED");
+		return 1;
 	} else {
 		show_text(2, "ACCESS DENIED");
+		return 0;
 	}
 }
 
@@ -160,8 +218,8 @@ void welcome_screen() {
 	show_text(0, "WELCOME");
 	// char* smileys = {1, 2, 1, 2, 1, 2};
 	char* smileys = "- - - - - - - - ";
-	for(char i=0; i<10; i++) {
-		for(char j=0; j<16; j++) {
+	for(int i=0; i<10; i++) {
+		for(int j=0; j<16; j++) {
 			if((j+i)%2) {
 				smileys[j] = j % 2 ? 1 : 2;
 			} else {
@@ -248,14 +306,48 @@ void calculator_program(void* args) {
 	}
 }
 
+
+void strncpy(char* dst, char* src, size_t len) {
+	for(unsigned i=0; i<len; i++) {
+		dst[i] = src[i];
+	}
+	dst[len] = 0;
+}
+
+int SCREEN_CHAR_WIDTH = 16;
 void ereader_program(void* args) {
+
+	unsigned cursor_pos = 0;
+	char* text = "He finishes his cereal and is about to disconnect when an anonynous message slices onto the screen. SCREEN Do you want to know what the Matrix is, Neo? Neo is frozen when he reads his name. SCREEN SUPERASTIC: Who said that? JACKON: Who's Neo? GIBSON: This is a private board. If you want to know, follow the white rabbit. NEO What the hell... SCREEN TIMAXE: Someone is hacking the hackers! FOS4: It's Morpheus!!!!! JACKON: Identify yourself. Knock, knock, Neo. A chill runs down his spine and when someone KNOCKS on his door he almost jumps out of his chair. He looks at the door, then back at the computer but the message is gone. He shakes his head, not completely sure what happened. Again, someone knocks. Cautiously, Neo approaches the door. VOICE (O.S.) Hey, Tommy-boy! You in there? Recognizing the voice, he relaxes and opens it. ANTHONY, who lives down the hall, is standing outside with a group of friends. NEO What do you want, Anthony? ANTHONY I need your help, man. Desperate. They got me, man. The shackles of fascism. He holds up the red notice that accompanies the Denver boot. NEO You got the money this time? He holds up two hundred dollars and Neo opens the door. Anthony's girlfriend, DUJOUR, stops in front of Neo. DUJOUR You can really get that thing off, right now? ANTHONY I told you, honey, he may look like just another geek but this here is all we got left standing between Big Brother and the New World Order. EXT. STREET A police officer unlocks a yellow metal boot from the wheel of an enormous oldsmobile. INT. NEO'S APARTMENT They watch from the window as the cops, silently, robotically, climb into their van. ANTHONY Look at 'em. Automatons. Don't think about what they're- doing or why. Computer tells 'em what to do and they do it. FRIEND #l Thc banality of evil. He slaps the money in Neo's hand. ANTHONY Thanks, neighbor. DUJOUR Why don't you come to the party with us? NEO I don't know. I have to work tomorrow. DUJOUR Come on. It'll be fun. He looks up at her and suddenly notices on her black leather motorcycle jacket dozens of pins: bands, symbols, slogans, military medals and -- A small white rabbit. The ROOM TILTS. NEO Yeah, yeah. Sure, I'll go. INT. APARTMENT An older Chicago apartment; a series of halls connects a chain of small high-ceilinged rooms lined with heavy casements. Smoke hangs like a veil, blurring the few lights there are. Dressed predominantly in black, people are everywhere, gathered in cliques around pieces of furniture like jungle cats around a tree. Neo stands against a wall, alone, sipping from a bottle of beer, feeling completely out of place, he is about to leave when he notices a woman staring at him. The woman is Trinity. She walks straight up to him. In the nearest room, shadow-like figures grind against each other to the pneumatic beat of INDUSTRIAL MUSIC. TRINITY Hello, Neo. NEO How did you know that -- TRINITY I know a lot about you. I've been wanting to meet you for some time. NEO Who are you? TRINITY My name is Trinity. NEO Trinity? The Trinity? The Trinity that cracked the I.R.S. Kansas City D-Base? TRINITY That was a long time ago. NEO Gee-zus. TRINITY What? NEO I just thought... you were a guy. TRINITY Most guys do. Neo is a little embarrassed. NEO Do you want to go sorewhere and talk? TRINITY No. It's safe here and I don't have much time. The MUSIC is so loud they must stand very close, talking directly into each other's ear. NEO That was you on the board tonight. That was your note, wasn't it? TRINITY I had to gamble that you would see and they wouldn't. NEO Who wouldn't? TRINITY I can't explain everything to you. I'm sure that it's all going to seem very strange, but I brought you here to warn you, Neo. You are in a lot of danger. NEO What? Why? TRINITY They're watching you. Something happened and they found out about you. Normally, if our target is exposed we let it go. But this time, we can't do that. NEO I don't understand -- TRINITY You came here because you wanted to know the answer to a hacker's question. NEO The Matrix. What is the Matrix? TRINITY Twelve years ago I met a man, a great man, who said that no one could be told the answer to that question. That they had to see it, to believe it. Her body is against his; her lips very close to his ear. TRINITY He told me that no one should look for the answer unless they have to because once you see it, everything changes. Your life and the world you live in will never be the same. It's as if you wake up one morning and the sky is falling. There is a hypnotic quality to her voice and Neo feels the words like a drug, seeping into him. TRINITY The truth is out there, Neo. It's looking for you and it will find you, if you want it to. She takes hold of him with her eyes. TRINITY That's all I can tell you right now. Good-bye, Neo. And good luck.";
+	char * line_buf = kmalloc(SCREEN_CHAR_WIDTH*8);
+
 	while(1) {
 		if(gpio_read(BUTTON_0)) {
 			while(gpio_read(BUTTON_0)){}
 			ClearScreen();
 			rpi_yield();
+		} else if (gpio_read(BUTTON_4)) {
+			clean_reboot();
 		}
-		show_text(0, "ereader");
+		if(is_any_button_pressed()) {
+			switch (get_button_stickiness(100)) {
+				case BUTTON_3:
+					// scroll down
+					cursor_pos++;
+					break;
+				case BUTTON_2:
+					// scroll up
+					cursor_pos--;
+					break;
+				default:
+					break;
+			}
+		}
+		show_text(0, "EREADER");
+		for(unsigned i=0; i<5; i++) {
+			strncpy(line_buf, &text[(i+cursor_pos)*SCREEN_CHAR_WIDTH], SCREEN_CHAR_WIDTH);
+			show_text(i+1, line_buf);
+		}
 	}
 }
 
@@ -265,6 +357,8 @@ void info_program(void* args) {
 			while(gpio_read(BUTTON_0)){}
 			ClearScreen();
 			rpi_yield();
+		} else if (gpio_read(BUTTON_4)) {
+			clean_reboot();
 		}
 		char* info_msg = "This computer was designed and built by Nadin and Noah in Dawson Engler's CS140e course.";
 		show_text(0, "Information");
@@ -305,6 +399,7 @@ void notmain(void) {
 	// welcome_screen();
 	rpi_fork(calculator_program, (void*)0);
 	rpi_fork(ereader_program, (void*)0);
+	rpi_fork(info_program, (void*)0);
 	rpi_thread_start(0);
 
 
@@ -356,9 +451,6 @@ void notmain(void) {
 		i++;
 	}
 
-
-
-	//
 	//
 	// 	4. use the code in gpioextra.h and then replace it with your
 	//	own (using the broadcom pdf in the docs/ directory).
