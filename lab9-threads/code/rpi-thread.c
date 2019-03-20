@@ -54,7 +54,6 @@ rpi_thread_t *rpi_fork(void (*code)(void *arg), void *arg) {
 	t->cpsr = rpi_get_cpsr();
 
 	Q_append(&runq, t);
-	printk("Thread reg %x\n", t->regs);
 	return t;
 }
 
@@ -82,35 +81,29 @@ void rpi_yield(void) {
 	rpi_cswitch(&previous_thread->sp, &cur_thread->sp);
 }
 
-void simpler_int_handler(){
+uint32_t simpler_int_handler(){
 	volatile rpi_irq_controller_t *r = RPI_GetIRQController();
 	if(r->IRQ_basic_pending & RPI_BASIC_ARM_TIMER_IRQ) {
 		rpi_thread_t* previous_thread = cur_thread;
-		//previous_thread->cpsr = cpsr;
+		previous_thread->cpsr = cpsr;
 
         cur_thread = Q_pop(&runq);
         if(!cur_thread) {
 			cur_thread = previous_thread;
 			RPI_GetArmTimer()->IRQClear = 1;
 			return;
-			//return cur_thread->cpsr;
+			return cur_thread->cpsr;
 		}
         
 		if(previous_thread->tid != scheduler_thread->tid) Q_append(&runq, previous_thread);
 		RPI_GetArmTimer()->IRQClear = 1;
 		*cur_thread_reg_array_pointer = cur_thread->regs;
 
-		printk("Previous thread #%d has values PC: %x, LR %x, SP %x\n", previous_thread->tid, previous_thread->regs[15], previous_thread->regs[14], previous_thread->regs[13]);
-
-		printk("cur thread #%d has values PC: %x, LR %x, SP %x\n", cur_thread->tid, cur_thread->regs[15], cur_thread->regs[14], cur_thread->regs[13]);
-
-		//return cur_thread->cpsr;
+		return cur_thread->cpsr;
     }
-    //return 0;
+    return 0;
 }
 
-// starts the thread system: nothing runs before.
-// 	- <preemptive_p> = 1 implies pre-emptive multi-tasking.
 void rpi_thread_start(int preemptive_p) {
 	scheduler_thread = mk_thread();
 
