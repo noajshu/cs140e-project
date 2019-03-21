@@ -2,8 +2,8 @@
 ### *Nadin El-Yabroudi and Noah Shutty*
 
 ## [Demo Video](https://youtu.be/aK1hxhdEgCs)
-![PICOM](./img/IMG_7257.JPG)
-![PICOM2](./img/IMG_7258.JPG)
+![PICOM](./img/IMG_7257.png)
+![PICOM2](./img/IMG_7258.png)
 
 ## Introduction
 Our project consisted of three parts: setting up an RFID card reader that interfaced with an OLED screen, creating preemptive threads, and implementing a few basic/fun demo applications for the resulting device. The purpose of the RFID card reader was to support two-factor authentication that would grant users permissions to run programs. The preemptive threads were intended to make the system design simpler. For instance, the OLED display would be controlled by one thread that read from a fixed region of volatile memory, and the various programs (including RFID authentication) would be peer threads. Two factor authentication is a modern approach to system security where multiple factors (e.g., a password and a Yubikey) are combined. Since requiring hardware 2FA for its employees in 2017, Google has detected zero instances of corporate credential theft [1].
