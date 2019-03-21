@@ -106,14 +106,25 @@ We implemented two programs to use. These are pretty simple to use and shown in 
 
 ### References
 [1] True2F: Backdoor-resistant authentication tokens
+
 [2] https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf
+
 [3] https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
+
 [4] https://blog.atlasrfidstore.com/uhf-rfid-tag-communications-protocols-standards
+
 [5] https://www.imsdb.com/scripts/Matrix,-The.html
+
 [6] http://infocenter.arm.com
+
 [7] http://makecourse.weebly.com/week10segment1.html
+
 [8] https://github.com/dwelch67/raspberrypi/tree/master/spi02
+
 [9] https://www.dummies.com/consumer-electronics/nfc-tag-initiation-sequence/
+
 [10] https://electronics.stackexchange.com/questions/58498/3-3v-input-to-arduino-digital-pin
+
 [11] https://www.amazon.com/gp/product/B07KGBJ9VG (SunFounder RFID Kit Mifare RC522 RFID Reader Module with S50 White Card and Key Ring for Arduino Raspberry Pi, $6.99)
+
 [12] https://www.adafruit.com/product/938 (or similar, ours was purchased ~ 2017)
