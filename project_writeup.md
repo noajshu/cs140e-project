@@ -63,11 +63,10 @@ The contactless card reader/writer that we used is based on the MFRC522 chip [2]
 
 The "hello, world!" equivalent in RFID is a REQA/WUPA-ATQA sequence. In this sequence, the transmitter broadcasts a 7 bit code WUPA (0x)
 
-
 We created the `MFRC522.h` library to interface with the RFID module. It
 
-![PICOM]("./img/IMG_7257.JPG")
-![PICOM2]("./img/IMG_7258.JPG")
+![PICOM](./img/IMG_7257.JPG)
+![PICOM2](./img/IMG_7258.JPG)
 
 
 ### OLED display
@@ -86,7 +85,7 @@ BUTTON_4 = 17,
 
 ### Wiring & assembly
 Our board is built from two linked breadboards. The RFID module is on the far left, the buttons on the right, and the display is in the center.
-![Wiring Diagram]("./img/picom_wiring_diagram.JPG")
+![Wiring Diagram](./img/picom_wiring_diagram.JPG)
 
 ### Project Video:
 https://youtu.be/aK1hxhdEgCs
