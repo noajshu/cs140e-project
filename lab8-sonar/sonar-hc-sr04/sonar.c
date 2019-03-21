@@ -193,8 +193,8 @@ void display_current_buttons_pressed() {
 }
 
 
-char * PASSWORD = "111";
-char PWDLEN = 3;
+char * PASSWORD = "3124";
+char PWDLEN = 4;
 char password_attempt[4];
 int password_authenticate() {
 	int i = 0;
@@ -210,6 +210,7 @@ int password_authenticate() {
 		return 1;
 	} else {
 		show_text(2, "ACCESS DENIED");
+		show_text(1, "        ");
 		return 0;
 	}
 }
@@ -405,7 +406,7 @@ void ereader_program(void* text) {
 	if(!text) {
 		text = matrix_script;
 	}
-	unsigned cursor_pos = 0;
+	int cursor_pos = 0;
 	
 	char * line_buf = kmalloc(SCREEN_CHAR_WIDTH*8);
 
@@ -431,6 +432,9 @@ void ereader_program(void* text) {
 					break;
 			}
 		}
+		if(cursor_pos < 0) {
+			cursor_pos = 0;
+		}
 		show_text(0, "EREADER");
 		for(unsigned i=0; i<5; i++) {
 			strncpy(line_buf, &text[(i+cursor_pos)*SCREEN_CHAR_WIDTH], SCREEN_CHAR_WIDTH);
@@ -439,24 +443,29 @@ void ereader_program(void* text) {
 	}
 }
 
+const char* info_msg = "This computer was designed and built by Nadin and Noah in Dawson Engler's CS140e course at Stanford University in the Winter Quarter of 2019.";
 void info_program(void* args) {
 	while(1) {
-		if(gpio_read(BUTTON_0)) {
-			while(gpio_read(BUTTON_0)){}
-			ClearScreen();
-			rpi_yield();
-		} else if (gpio_read(BUTTON_4)) {
-			clean_reboot();
+		switch (get_button()) {
+			case BUTTON_0:
+				// context switch
+				while(gpio_read(BUTTON_0)){}
+				ClearScreen();
+				rpi_yield();
+				break;
+			case BUTTON_4:
+				clean_reboot();
+				break;
+			case BUTTON_1:
+				// display system information
+				ClearScreen();
+				ereader_program(info_msg);
+				break;
 		}
-		char* info_msg = "This computer was designed and built by Nadin and Noah in Dawson Engler's CS140e course at Stanford University in the Winter Quarter of 2019.";
 		show_text(0, "Information");
 		show_text(1, "Press 1 to learn");
 		show_text(2, "about this");
 		show_text(3, "device.");
-		if(get_button() ==  BUTTON_1) {
-			ClearScreen();
-			ereader_program(info_msg);
-		}
 
 		// for(i=0; i)
 		// show_text(1, info_msg);

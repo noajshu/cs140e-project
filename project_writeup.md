@@ -12,14 +12,9 @@ To run the RFID & OLED Screen system follow these steps:
 2. Go to the project directory: `cd lab8-sonar/sonar-hc-sr04`
 3. Make the binary: `make`
 4. Run the program `my-install sonar.bin`
-5. You should see 'LOGIN PASSWORD:' showing on the screen. The password is '111', so press button 1 three times.
+5. You should see 'LOGIN PASSWORD:' showing on the screen. The password is '3124'.
 6. Do two factor authentication by scanning an RFID token on the RFID reader. You should see the Welcome screen.
-7. Press button 0 to enter the programs.
-
-
-Our system presents the user with a login screen requiring a password. The password is in the spectral order, i.e. red, yellow, green, blue. The gray button is a system lockout button that denies access.
-
-Upon presenting valid credentials, a prompt is shown to authenticate with an RFID card. After presenting a card to the reader, the user enters the program environment.
+7. Press button 0 to enter the program environment and thereafter to context switch between tasks.
 
 ### Preemptive Threads
 NOTE: We did not achieve fully functioning preemptive threads. Despite trying many approaches we were not able to correctly store the link register for a thread that had been preempted. As a result when you first launch a thread it correctly runs its code, however when you switch back to a preempted thread it sometimes does not return to the right place.
@@ -51,16 +46,59 @@ You should see a test for preemptive threads running that prints out 'Hello, fro
  Another way to do this could have been to disable interrupts when `enable_dni()` was set. However, we decided not to do it this way because if a thread never disabled the dni bit then the thread could starve all other threads. By keeping interrupts enabled the OS could kill a thread that has been running with the dni bit enabled for a long time.
 
 
+### SPI
+It is actually quite simple to get SPI0 to work, although we went through some trial and error. We created the `my-spi.h` library exposing the `my_spi_init` function, which you can see is quite short.
+First, there are 3 total SPI interfaces documented in the BCM2835 peripherals doc. SPI1 and SPI2 are “mini” SPI modules documented next to the mini UART that we use. However, the enable reg for SPI1 is called SPI0, and similar for SPI2. This is confusing but they mention it in the errata. 
+
+More importantly, neither of the SPI1/2 interfaces are what you want to use. The pinout on the pi board actually connects to the “real” SPI0, which is documented around page 152. There is no need to “enable” this module, as long as you set the GPIO alt0 functions correctly and write to the FIFO reg you are good to go. 
+
+If you still have problems, a hack for testing that SPI0 (and probably other serial protocols) are active is to hook up the MISO and MOSI pins of your pi and make it talk to itself. Also you can hook up LEDs to the clock and chip select registers to see if they flash in the right order, although the baud rate must be set very low (high clock div) in order for the flashes to be visible. In my case it was the peripheral (RFID) I was trying to use, and not my pi, that was the problem. Essentially, the device enters sleep mode and needs to be reset by writing LO and then HI on the RST pin. I learned this by reading the Arduino library available here as a .zip file: [7].
+
+One cool feature of SPI is that it sets a chip select (CS) pin to LO to tell a slave that it should pay attention to the incoming signal. It's important to set the appropriate CS bits in the CS (I think this stands for "Control Status") register (yes, the CS register has two CS bits). The upside here is that you can talk to different slaves by adjusting the CS bits, so we built a small 1 to 2 SPI network where the CLK, MOSI, and MISO pins are all shared between the RFID and the OLED, using SPI0_CE0_N (pin 24) and SPI0_CE1_N (pin 26) to control the RFID and the OLED. Specifically, the RFID module is chip 1 and the OLED is chip 0. This was largely a choice of convenience as the OLED driver from dwelch67 manipulates registers directly (hard to edit) and assumes the OLED is chip 0. Once we experimented with dwelch67's OLED module which includes its own `spi_init` function, we decided to use his function to make it easier to compile everything. Our `my_spi_init` function can still be used for this purpose.
+
+
 ### MFRC522 and RFID technology
-The contactless card reader/writer that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code, a Miller code, has the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 
+The contactless card reader/writer that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code is a "bi-phase code" with the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 1's is sent [4].
+![biphasecode]("https://blog.atlasrfidstore.com/wp-content/uploads/2016/05/FMO-Coding.jpg")
+
+The "hello, world!" equivalent in RFID is a REQA/WUPA-ATQA sequence. In this sequence, the transmitter broadcasts a 7 bit code WUPA (0x)
 
 
+We created the `MFRC522.h` library to interface with the RFID module. It
+
+![PICOM]("./img/IMG_7257.JPG")
+![PICOM2]("./img/IMG_7258.JPG")
+
+
+### OLED display
+Dave Welch has published a convenient library "spi02" for working with the SSD1306 family of OLED drivers [8]. Our display is a 128x64 OLED module on board with the driver included, and came from Adafruit. The spi02 module is fairly easy to adapt for linking in, and provides the functions `ClearScreen` and `show_text` that we use. We did adjust the `show_text` function to remove an offset of 32 pixels. We also modified the code to GPIO instead of the CS1 to do the screen reset, to clear the screen.
+
+### BUTTONS
+We had plenty of GPIO pins to spare so we used 1 pin for each of the 5 buttons. In theory we could sense any button using only 3 gpio pins and lots of wires. Pressing a button completes the circuit to make one GPIO pin go high. Out of an abundance of caution for the pi, we don't wire the 3V output directly to the buttons, as we saw mixed advice on whether this is safe on various boards. For example, this Stack Exchange question [] says (about the arduino) "Be aware that the controller pin must be configured as INPUT, otherwise you may exceed maximum current for the pin", so we figured it would be safer to configure the gpio to INPUT mode for all buttons before the possibility of voltage being supplied to them. For this purpose we used a sixth GPIO pin for the button Vcc. The pins we used also defined constants used throughout the program to refer to each button. Here are the pins in order (gray yellow green red blue buttons):
+```
+BUTTON_0 = 23,
+BUTTON_1 = 18,
+BUTTON_2 = 22,
+BUTTON_3 = 27,
+BUTTON_4 = 17,
+```
+
+
+### Wiring & assembly
+Our board is built from two linked breadboards. The RFID module is on the far left, the buttons on the right, and the display is in the center.
+![Wiring Diagram]("./img/picom_wiring_diagram.JPG")
+
+### Project Video:
+https://youtu.be/aK1hxhdEgCs
 
 ### References
 [1] True2F: Backdoor-resistant authentication tokens
 [2] https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf
 [3] https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
-
-
+[4] https://blog.atlasrfidstore.com/uhf-rfid-tag-communications-protocols-standards
 [5] https://www.imsdb.com/scripts/Matrix,-The.html
 [6] http://infocenter.arm.com
+[7] http://makecourse.weebly.com/week10segment1.html
+[8] https://github.com/dwelch67/raspberrypi/tree/master/spi02
+[9] https://www.dummies.com/consumer-electronics/nfc-tag-initiation-sequence/
+[10] https://electronics.stackexchange.com/questions/58498/3-3v-input-to-arduino-digital-pin
