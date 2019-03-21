@@ -92,10 +92,16 @@ BUTTON_2 = 22,
 BUTTON_3 = 27,
 BUTTON_4 = 17,
 ```
-![Wiring Diagram](./img/picom_wiring_diagram.JPG)
+We used GPIO pin 4 as our `BUTTON_HI_PIN` and GPIO pin 6 as our `OLED_RST_PIN` as described above. You can see a wiring diagram below:
 
-### Project Video:
-https://youtu.be/aK1hxhdEgCs
+![Wiring Diagram](./img/picom_wiring_diagram.png)
+Omitted is the 3v3 power pin used to supply voltage to the OLED and RFID modules, as any 3V pin may be used.
+
+### Programs implemented
+We implemented two programs to use. These are pretty simple to use and shown in the demo video, so I won't describe them much here. The main technical point is that each program is in a rendering loop that checks at each iteration whether to do a context switch. Context switches must be prefixed by an OLED ClearScreen(). The two programs are an e-reader and a calculator. There is also an "about this computer"-style info screen that actually just launches the ereader program with a different piece of text.
+
+### Project Demo Video:
+[https://youtu.be/aK1hxhdEgCs](https://youtu.be/aK1hxhdEgCs)
 
 ### References
 [1] True2F: Backdoor-resistant authentication tokens
