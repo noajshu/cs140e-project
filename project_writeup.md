@@ -52,7 +52,7 @@ You should see a test for preemptive threads running that prints out 'Hello, fro
 
 
 ### SPI
-It is actually quite simple to get SPI0 to work, although we went through some trial and error. We created the `my-spi.h` library exposing the `my_spi_init` function, which you can see is quite short.
+It is simple to use SPI0, although we went through some trial and error. We have created the `my-spi.h` library exposing the `my_spi_init` function, which you can see is quite short.
 First, there are 3 total SPI interfaces documented in the BCM2835 peripherals doc. SPI1 and SPI2 are “mini” SPI modules documented next to the mini UART that we use. However, the enable reg for SPI1 is called SPI0, and similar for SPI2. This is confusing but they mention it in the errata. 
 
 More importantly, neither of the SPI1/2 interfaces are what you want to use. The pinout on the pi board actually connects to the “real” SPI0, which is documented around page 152. There is no need to “enable” this module, as long as you set the GPIO alt0 functions correctly and write to the FIFO reg you are good to go. 
