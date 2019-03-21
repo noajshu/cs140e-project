@@ -61,7 +61,7 @@ One cool feature of SPI is that it sets a chip select (CS) pin to LO to tell a s
 
 ### MFRC522 and RFID technology
 The contactless card reader/writer that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code is a "bi-phase code" with the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 1's is sent [4].
-![biphasecode]("https://blog.atlasrfidstore.com/wp-content/uploads/2016/05/FMO-Coding.jpg")
+![biphasecode](https://blog.atlasrfidstore.com/wp-content/uploads/2016/05/FMO-Coding.jpg)
 
 The "hello, world!" equivalent in RFID is a REQA/WUPA-ATQA sequence. In this sequence, the transmitter broadcasts a 7 bit code WUPA (0x)
 
