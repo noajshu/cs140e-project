@@ -1,4 +1,4 @@
-# Final Project Proposal
+# Final Project Writeup
 ### *Nadin El-Yabroudi and Noah Shutty*
 
 ### [Demo Video](https://youtu.be/aK1hxhdEgCs)
