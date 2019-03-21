@@ -1,7 +1,7 @@
 # Final Project Writeup
 ### *Nadin El-Yabroudi and Noah Shutty*
 
-### [Demo Video](https://youtu.be/aK1hxhdEgCs)
+## [Demo Video](https://youtu.be/aK1hxhdEgCs)
 ![PICOM](./img/IMG_7257.JPG)
 ![PICOM2](./img/IMG_7258.JPG)
 
