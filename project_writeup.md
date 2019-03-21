@@ -19,6 +19,7 @@ To run the RFID & OLED Screen system follow these steps:
 5. You should see 'LOGIN PASSWORD:' showing on the screen. The password is '3124'.
 6. Do two factor authentication by scanning an RFID token on the RFID reader. You should see the Welcome screen.
 7. Press button 0 to enter the program environment and thereafter to context switch between tasks.
+8. See the demo video for more details on how to use the demo programs.
 
 ### Preemptive Threads
 NOTE: We did not achieve fully functioning preemptive threads. Despite trying many approaches we were not able to correctly store the link register for a thread that had been preempted. As a result when you first launch a thread it correctly runs its code, however when you switch back to a preempted thread it sometimes does not return to the right place.
