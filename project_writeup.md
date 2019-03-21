@@ -2,6 +2,8 @@
 ### *Nadin El-Yabroudi and Noah Shutty*
 
 ### [Demo Video](https://youtu.be/aK1hxhdEgCs)
+![PICOM](./img/IMG_7257.JPG)
+![PICOM2](./img/IMG_7258.JPG)
 
 ## Introduction
 Our project consisted of three parts: setting up an RFID card reader that interfaced with an OLED screen, creating preemptive threads, and implementing a few basic/fun demo applications for the resulting device. The purpose of the RFID card reader was to support two-factor authentication that would grant users permissions to run programs. The preemptive threads were intended to make the system design simpler. For instance, the OLED display would be controlled by one thread that read from a fixed region of volatile memory, and the various programs (including RFID authentication) would be peer threads. Two factor authentication is a modern approach to system security where multiple factors (e.g., a password and a Yubikey) are combined. Since requiring hardware 2FA for its employees in 2017, Google has detected zero instances of corporate credential theft [1].
@@ -60,22 +62,29 @@ One cool feature of SPI is that it sets a chip select (CS) pin to LO to tell a s
 
 
 ### MFRC522 and RFID technology
-The contactless card reader/writer that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code is a "bi-phase code" with the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 1's is sent [4].
+The contactless card reader/writer module [11] that we used is based on the MFRC522 chip [2]. The general idea is that the RFID board transmits power over radio waves around 13 MHz, that are used to drive current through the contactless card, activating its onboard IC, the MF1S50YYX [3]. The 13 MHz signal is modulated by a special code to transmit data. The code is a "bi-phase code" with the property that the frequency of the signal does not deviate much from ~13 MHz even if a stream of all 1's is sent [4].
 ![biphasecode](https://blog.atlasrfidstore.com/wp-content/uploads/2016/05/FMO-Coding.jpg)
 
-The "hello, world!" equivalent in RFID is a REQA/WUPA-ATQA sequence. In this sequence, the transmitter broadcasts a 7 bit code WUPA (0x)
+The "hello, world!" equivalent in RFID is a REQA/WUPA-ATQA sequence. In this sequence, the transmitter broadcasts a 7 bit code WUPA (`0x52`) or REQA (`0x26`) which invites the Proximity Integrated Circuit Card (PICC) to activate and respond with a 16 bit ATQA including its UID prefix. The protocol is standardized and details can be found at [3], and a simple explanation is here: [9]. The RFID standard is more or less straightforward, the only complicated part is anticollision / cascading (the way the reader deals with multiple cards in the RF field), but we didn't implement any of these features.
 
-We created the `MFRC522.h` library to interface with the RFID module. It
+We created the `MFRC522.h` library to interface with the RFID module. It includes key functions `rfid_transaction` which asynchronously reads and writes the specified number of output and input bytes through SPI0 while watching TXD & RXD bits of the CS register, which indicate the read and write SPI0 FIFO statuses. The way you interact with the MFRC522 is to read and write its various registers. This is via a simple protocol specified in [2] section 8.1.2. *Keep in mind that the first byte received by the master during an SPI(0) transaction is junk, not the actual register value.* This is because the MFRC522 must get the address you want to read in the first byte you send before it can respond with the address's value, but the pi's SPI0 interface interprets the junk on the first byte as actual data! (This is probably because there are situations where the slave, upon selection via HI->LO on the chip select, could immediately begin transmission.) The MFRC522 is also often referred to as a Proximity Coupling Device (PCD).
 
-![PICOM](./img/IMG_7257.JPG)
-![PICOM2](./img/IMG_7258.JPG)
+##### Initialization / use
+The datasheet is quite nice, obviously the chip has a bunch of features (hence, registers) that you don't need and can ignore, but **see the registers I used in MFRC522.h** -- these are the important ones. There are so many registers that it's not really worth reciting them all here, but to initialize all you should do is use some GPIO pin on the pi to set the RST pin of the module to 0 for 50 ms, then back up to 1, and just leave it there. This keeps it out of "soft power-down mode". After that you should put the card in idle mode by setting the command bits (the 4 bits 3:0) of the CommandReg to 0. **You also must set the RcvOff bit to 0, this is the CommandReg bit 5. Otherwise everything else will work but you will not be able to receive data.** The other registers for initialization in order to detect nearby RFID cards are straightforward -- if you want the details see `detect_rfid_card` in MFRC522.h. One note is that WUPA and REQA are 7 bit commands so you must set the BitFramingReg bits 2:0 to 0b111 (=7, while 0 (the default) means a full byte) before writing your WUPA/REQA to the FIFO reg. You should use transceive command to communicate with PICCs -- this means the PCD immediately switches to listen for the PICC's response after completing transmission. In this mode the PCD waits for you to set bit 7 of the BitFramingReg to 1 before it begins emptying the FIFO contents into the transmission.
 
+See section 10.3.1 for all the commands. There is a command `Generate RandomID = 0b0010` to generate random IDs, I thought this would be good to test the card with but found that the FIFO stayed empty after running it. Upon closer reading of the datasheet there are actually two FIFOs, the one on the FifoReg (64 bytes) and another internal 25 byte FIFO. However, I did see the `Mem` command which can be used (if the 64-byte FIFO is empty) to transfer data backwards, so this could be a good thing to try.
 
 ### OLED display
-Dave Welch has published a convenient library "spi02" for working with the SSD1306 family of OLED drivers [8]. Our display is a 128x64 OLED module on board with the driver included, and came from Adafruit. The spi02 module is fairly easy to adapt for linking in, and provides the functions `ClearScreen` and `show_text` that we use. We did adjust the `show_text` function to remove an offset of 32 pixels. We also modified the code to GPIO instead of the CS1 to do the screen reset, to clear the screen.
+dwelch67 has published a convenient library "spi02" for working with the SSD1306 family of OLED drivers [8]. Our display is a 128x64 OLED module on a board with the driver IC included, and came from Adafruit [12]. The spi02 module is fairly easy to adapt for linking in, and provides the functions `ClearScreen` and `show_text` that we use. We did adjust the `show_text` function to remove an offset of 32 pixels. We also modified the code to GPIO instead of the CS1 to do the screen reset, to clear the screen. This way we had another CS to use for the RFID board.
+
 
 ### BUTTONS
-We had plenty of GPIO pins to spare so we used 1 pin for each of the 5 buttons. In theory we could sense any button using only 3 gpio pins and lots of wires. Pressing a button completes the circuit to make one GPIO pin go high. Out of an abundance of caution for the pi, we don't wire the 3V output directly to the buttons, as we saw mixed advice on whether this is safe on various boards. For example, this Stack Exchange question [] says (about the arduino) "Be aware that the controller pin must be configured as INPUT, otherwise you may exceed maximum current for the pin", so we figured it would be safer to configure the gpio to INPUT mode for all buttons before the possibility of voltage being supplied to them. For this purpose we used a sixth GPIO pin for the button Vcc. The pins we used also defined constants used throughout the program to refer to each button. Here are the pins in order (gray yellow green red blue buttons):
+We had plenty of GPIO pins to spare so we used 1 pin for each of the 5 buttons. In theory we could sense any one button using only 3 gpio pins and lots of wires. Pressing a button completes the circuit to make one GPIO pin go high. Out of an abundance of caution for the pi, we don't wire the 3V output directly to the buttons, as we saw mixed advice on whether this is safe on various boards. For example, this Stack Exchange question [10] says (about the arduino) "Be aware that the controller pin must be configured as INPUT, otherwise you may exceed maximum current for the pin", so we figured it would be safer to configure the gpio to INPUT mode for all buttons before the possibility of voltage being supplied to them. For this purpose we used a sixth GPIO pin for the button Vcc. The pins we used also defined constants used throughout the program to refer to each button. These are in the next section
+
+
+### Wiring & assembly
+Our board is built from two linked breadboards. The RFID module is on the far left, the buttons on the right, and the display is in the center.
+Here are the button pins in order (gray yellow green red blue buttons):
 ```
 BUTTON_0 = 23,
 BUTTON_1 = 18,
@@ -83,10 +92,6 @@ BUTTON_2 = 22,
 BUTTON_3 = 27,
 BUTTON_4 = 17,
 ```
-
-
-### Wiring & assembly
-Our board is built from two linked breadboards. The RFID module is on the far left, the buttons on the right, and the display is in the center.
 ![Wiring Diagram](./img/picom_wiring_diagram.JPG)
 
 ### Project Video:
@@ -103,3 +108,5 @@ https://youtu.be/aK1hxhdEgCs
 [8] https://github.com/dwelch67/raspberrypi/tree/master/spi02
 [9] https://www.dummies.com/consumer-electronics/nfc-tag-initiation-sequence/
 [10] https://electronics.stackexchange.com/questions/58498/3-3v-input-to-arduino-digital-pin
+[11] https://www.amazon.com/gp/product/B07KGBJ9VG (SunFounder RFID Kit Mifare RC522 RFID Reader Module with S50 White Card and Key Ring for Arduino Raspberry Pi, $6.99)
+[12] https://www.adafruit.com/product/938 (or similar, ours was purchased ~ 2017)
